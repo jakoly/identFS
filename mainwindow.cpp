@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+#include "addfilestoproject.h"
 #include "addfiles.h"
 #include <QListWidgetItem>
 #include <QFont>
@@ -9,7 +10,7 @@
 #include <iomanip>
 #include <QSettings>
 #include <QDebug>
-#include <fstream>
+#include <filesystem>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,6 +22,8 @@ MainWindow::MainWindow(QWidget *parent)
     //----Slot-Connection----
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
+    connect(ui->projectList, &QListWidget::itemClicked, this, &MainWindow::onProjectItemClicked);
+
 
     //----CODE----
     // DB öffnen
@@ -32,13 +35,8 @@ MainWindow::MainWindow(QWidget *parent)
         std::cout << "Database opened successfully!" << std::endl;
     }
 
-    // Beispiel: QListWidget Item
-    QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/project.png"), "Beispiel");
-    ui->projectList->setIconSize(QSize(32, 32));
-    QFont font = ui->projectList->font();
-    font.setPointSize(14);
-    ui->projectList->setFont(font);
-    ui->projectList->addItem(item);
+
+    updateProjectList();
 }
 
 MainWindow::~MainWindow()
@@ -76,9 +74,31 @@ void MainWindow::newProject()
     std::cout << "Project-UUID: " << UUID << std::endl;
     std::cout << "Name: " << projectName << std::endl;
 
+    // --- Vault-Ordner erstellen ---
+    std::filesystem::path path;
+    try {
+        // Drive Letter direkt aus QSettings
+        QSettings settings("settings.ini", QSettings::IniFormat);
+        QString driveLetter = settings.value("user/driveLetter", "C").toString();
+
+        // Pfad zusammensetzen (mit ":" für Windows-Laufwerke)
+        path = std::filesystem::path((driveLetter + ":\\").toStdString())
+                                     / "IdentFS" / "vault" / UUID;
+
+        // Ordner erstellen
+        if (std::filesystem::create_directories(path)) {
+            std::cout << "Ordner erstellt: " << path << std::endl;
+        } else {
+            std::cout << "Ordner existiert bereits oder konnte nicht erstellt werden." << std::endl;
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Fehler: " << e.what() << std::endl;
+    }
+
+
     // Insert in DB
     sqlite3_stmt* stmt;
-    const char* sqlInsert = "INSERT INTO projects (project_uuid, name) VALUES (?, ?);";
+    const char* sqlInsert = "INSERT INTO projects (project_uuid, name, vault_path) VALUES (?, ?, ?);";
     int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
     if(rc != SQLITE_OK) {
         std::cerr << "Error while preparing: " << sqlite3_errmsg(db) << std::endl;
@@ -87,13 +107,18 @@ void MainWindow::newProject()
 
     sqlite3_bind_text(stmt, 1, UUID.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, projectName.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, path.string().c_str(), -1, SQLITE_TRANSIENT);
 
     if(sqlite3_step(stmt) != SQLITE_DONE)
         std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
 
     sqlite3_finalize(stmt);
 
+
+
+
     std::cout << "Projekt erfolgreich hinzugefuegt!" << std::endl;
+    updateProjectList();
 
     // LineEdit leeren
     ui->lineEditProjectName->clear();
@@ -122,4 +147,48 @@ void MainWindow::saveDefaultSettings()
     QString driveLetter = settings.value("user/driveLetter").toString();
 
     qDebug() << "Name:" << name << "Theme:" << theme << "Drive-Letter: " << driveLetter;
+}
+
+void MainWindow::updateProjectList() {
+    // QListWidget Item
+    ui->projectList->setIconSize(QSize(32, 32));
+    QFont font = ui->projectList->font();
+    font.setPointSize(14);
+    ui->projectList->setFont(font);
+    ui->projectList->clear();
+
+
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, "SELECT project_uuid, name, vault_path FROM projects;", -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        // Fehlerbehandlung
+    }
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char* uuidText = sqlite3_column_text(stmt, 0);
+        const unsigned char* nameText = sqlite3_column_text(stmt, 1);
+        const unsigned char* vaultText = sqlite3_column_text(stmt, 2);
+
+        QString uuid = reinterpret_cast<const char*>(uuidText);
+        QString name = reinterpret_cast<const char*>(nameText);
+        QString vaultPath = reinterpret_cast<const char*>(vaultText);
+
+        QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/project.png"), name);
+        item->setData(Qt::UserRole, uuid);
+        ui->projectList->addItem(item);
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+void MainWindow::onProjectItemClicked(QListWidgetItem *item)
+{
+    QString name = item->text();
+    QString uuid = item->data(Qt::UserRole).toString(); // falls du UUID gespeichert hast
+
+    projectUUID = uuid;
+    projectName = name;
+
+    qDebug() << "Item geklickt: " << name << " UUID:" << uuid;
+
+    // Hier kannst du z.B. das Projekt öffnen oder Details anzeigen
 }

@@ -2,12 +2,15 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <iostream>
 #include <windows.h>
 #include <objbase.h>
 #include <string>
 #include "libs/sqlite/sqlite3.h"
-
+#include <QListWidgetItem>
+#include <QFont>
+#include <QIcon>
+#include <QSettings>
+#include <QDebug>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -24,10 +27,15 @@ public:
     ~MainWindow();
     sqlite3* db;   // DB-Pointer
 
+    QString projectName;
+    QString projectUUID;
+
 public slots:
     void newProject();
     void openAddFilesWindow();
     void saveDefaultSettings();
+    void updateProjectList();
+    void onProjectItemClicked(QListWidgetItem *item);
 
 private:
     Ui::MainWindow *ui;

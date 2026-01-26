@@ -23,6 +23,7 @@ class tools
 {
 public:
     tools();
+    QString getDriveLetter();
 };
 
 std::string guidToString(const GUID& guid);

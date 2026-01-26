@@ -43,7 +43,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         addfiles.h addFiles.cpp addfiles.ui
         addfiles.h addfiles.cpp addfiles.ui
-        tools.h tools.cpp
+        addfilestoproject.h addfilestoproject.cpp addfilestoproject.ui
+
+
 
 
     )
