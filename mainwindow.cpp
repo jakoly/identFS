@@ -1,0 +1,125 @@
+#include "mainwindow.h"
+#include "./ui_mainwindow.h"
+#include "addfiles.h"
+#include <QListWidgetItem>
+#include <QFont>
+#include <QIcon>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <QSettings>
+#include <QDebug>
+#include <fstream>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+    saveDefaultSettings();
+
+    //----Slot-Connection----
+    connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
+    connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
+
+    //----CODE----
+    // DB öffnen
+    db = nullptr;
+    int rc = sqlite3_open("../../identfs.db", &db);
+    if(rc) {
+        std::cerr << "Database can't be opened: " << sqlite3_errmsg(db) << std::endl;
+    } else {
+        std::cout << "Database opened successfully!" << std::endl;
+    }
+
+    // Beispiel: QListWidget Item
+    QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/project.png"), "Beispiel");
+    ui->projectList->setIconSize(QSize(32, 32));
+    QFont font = ui->projectList->font();
+    font.setPointSize(14);
+    ui->projectList->setFont(font);
+    ui->projectList->addItem(item);
+}
+
+MainWindow::~MainWindow()
+{
+    if(db) sqlite3_close(db);
+    delete ui;
+}
+
+
+std::string MainWindow::guidToString(const GUID& guid) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0')
+       << std::setw(8) << guid.Data1 << "-"
+       << std::setw(4) << guid.Data2 << "-"
+       << std::setw(4) << guid.Data3 << "-";
+    for(int i=0; i<2; i++) ss << std::setw(2) << static_cast<int>(guid.Data4[i]);
+    ss << "-";
+    for(int i=2; i<8; i++) ss << std::setw(2) << static_cast<int>(guid.Data4[i]);
+    return ss.str();
+}
+
+void MainWindow::newProject()
+{
+    QString projectNameInput = ui->lineEditProjectName->text();
+    std::string projectName = projectNameInput.toStdString();
+    if(projectName.empty()) return;
+
+    // UUID erzeugen
+    GUID guid;
+    if (CoCreateGuid(&guid) != S_OK) {
+        std::cerr << "Error while creating the uuid!" << std::endl;
+        return;
+    }
+    std::string UUID = guidToString(guid);
+    std::cout << "Project-UUID: " << UUID << std::endl;
+    std::cout << "Name: " << projectName << std::endl;
+
+    // Insert in DB
+    sqlite3_stmt* stmt;
+    const char* sqlInsert = "INSERT INTO projects (project_uuid, name) VALUES (?, ?);";
+    int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
+    if(rc != SQLITE_OK) {
+        std::cerr << "Error while preparing: " << sqlite3_errmsg(db) << std::endl;
+        return;
+    }
+
+    sqlite3_bind_text(stmt, 1, UUID.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, projectName.c_str(), -1, SQLITE_TRANSIENT);
+
+    if(sqlite3_step(stmt) != SQLITE_DONE)
+        std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
+
+    sqlite3_finalize(stmt);
+
+    std::cout << "Projekt erfolgreich hinzugefuegt!" << std::endl;
+
+    // LineEdit leeren
+    ui->lineEditProjectName->clear();
+}
+
+void MainWindow::openAddFilesWindow()
+{
+    // Modelless-Fenster (kann parallel zu MainWindow benutzt werden)
+    addFiles *window = new addFiles(this);  // "this" als Parent optional
+    window->show();  // zeigt das Fenster
+}
+
+void MainWindow::saveDefaultSettings()
+{
+    // Pfad + Format bestimmen (INI-Datei im Programmverzeichnis)
+    QSettings settings("settings.ini", QSettings::IniFormat);
+
+    // Werte hartcodiert setzen
+    settings.setValue("user/name", "Jakob");
+    settings.setValue("app/theme", "light");
+    settings.setValue("user/driveLetter", "C");
+
+    // Werte können jederzeit wieder ausgelesen werden
+    QString name = settings.value("user/name").toString();
+    QString theme = settings.value("app/theme").toString();
+    QString driveLetter = settings.value("user/driveLetter").toString();
+
+    qDebug() << "Name:" << name << "Theme:" << theme << "Drive-Letter: " << driveLetter;
+}

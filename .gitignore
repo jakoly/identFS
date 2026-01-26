@@ -1,0 +1,16 @@
+# Qt Creator / Qt
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qrc~ 
+*.moc
+*.obj
+*.o
+*.exe
+*.dll
+*.pdb
+build-*/
+
+# OS Files
+.DS_Store
+Thumbs.db

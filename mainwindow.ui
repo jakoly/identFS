@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1920</width>
+    <height>1080</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Ident FS</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QWidget" name="layoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>540</x>
+      <y>170</y>
+      <width>281</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <layout class="QGridLayout" name="Project_Input" rowstretch="0,0" columnminimumwidth="0,0">
+     <property name="sizeConstraint">
+      <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+     </property>
+     <item row="1" column="1">
+      <widget class="QPushButton" name="pushButtonCreateProject">
+       <property name="font">
+        <font>
+         <pointsize>15</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Eingeben</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_2">
+       <property name="font">
+        <font>
+         <pointsize>20</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Projektname</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLineEdit" name="lineEditProjectName">
+       <property name="font">
+        <font>
+         <pointsize>15</pointsize>
+        </font>
+       </property>
+       <property name="inputMask">
+        <string/>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QListWidget" name="projectList">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>320</y>
+      <width>256</width>
+      <height>192</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButtonAddFiles">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>170</y>
+      <width>261</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>15</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Dateien hinzufügen</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1920</width>
+     <height>22</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

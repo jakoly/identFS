@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>addFiles</class>
+ <widget class="QDialog" name="addFiles">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>633</width>
+    <height>451</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Ident FS - Dateien hinzufügen</string>
+  </property>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>20</y>
+     <width>431</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>30</pointsize>
+    </font>
+   </property>
+   <property name="text">
+    <string>Hinzufügen von Dateien</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_2">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>70</y>
+     <width>551</width>
+     <height>61</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Durch das Hinzufügen von Dateien, können sie diese zu ihren Projekten hinzufügen. Die Dateien werden außerdem durch eineultra-komprimierte&lt;span style=&quot; font-weight:700;&quot;&gt; BackUp-Version &lt;/span&gt;gesichert, ega, ob sie die Dateien löschen. Die BackUp-Versionen wird weiterhin für den gewählten Zeitraum aufbewahrt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="textFormat">
+    <enum>Qt::TextFormat::AutoText</enum>
+   </property>
+   <property name="scaledContents">
+    <bool>false</bool>
+   </property>
+   <property name="wordWrap">
+    <bool>true</bool>
+   </property>
+   <property name="margin">
+    <number>1</number>
+   </property>
+   <property name="openExternalLinks">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButtonAddFiles">
+   <property name="geometry">
+    <rect>
+     <x>60</x>
+     <y>140</y>
+     <width>211</width>
+     <height>61</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Dateien auswählen</string>
+   </property>
+  </widget>
+  <widget class="QListWidget" name="listWidgetFiles">
+   <property name="geometry">
+    <rect>
+     <x>330</x>
+     <y>140</y>
+     <width>256</width>
+     <height>221</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButtonOk">
+   <property name="geometry">
+    <rect>
+     <x>450</x>
+     <y>400</y>
+     <width>75</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>OK</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButtonCancel">
+   <property name="geometry">
+    <rect>
+     <x>530</x>
+     <y>400</y>
+     <width>75</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Cancel</string>
+   </property>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
