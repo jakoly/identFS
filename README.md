@@ -10,7 +10,7 @@
 - **Keine neue Denkweise nötig.** Explorer bleibt erhalten, identFS ergänzt über Kontextmenü, UI-Buttons und Dashboard. 🖱️
 
 
-## Zielgruppe / Massentauglichkeit 🎯
+## Zielgruppe 🎯
 identFS eignet sich für:  
 - Privatanwender, die Ordnung, Backups und einfache Wiederherstellung wollen ✅  
 - Kreative (Fotos, Videos, Projekte), die Dateien logisch bündeln möchten 🎨  
@@ -35,31 +35,8 @@ identFS eignet sich für:
 - Einfache, sichere Wiederherstellung auch bei Umbenennungen oder Verschiebungen. 🔄
 
 
-## Quick Start (in 3 Schritten) ⚡
-1. Installer ausführen (Windows 10/11). 🖱️  
-2. Initial-Scan starten (je nach Datenmenge etwas Zeit ⏳).  
-3. Explorer öffnen: neue Kontextoptionen & Dashboard sind verfügbar ✅
-
-
 ## Technische Kurzinfos 🖥️
-- Hash-Standard: **BLAKE3** (schnell), optional SHA-256  
-- Überwachung: **USN Journal** (produktiv), `QFileSystemWatcher` (Prototyp/Test)  
-- Datenbanken: `file.db`, `project.db`, `archive.db` (SQLite, WAL-Modus)  
-- UI: Qt (Split-View, Activity-Log, Statusleiste)  
+- Hash-Standard: **SHA-256** (schnell)
+- Überwachung: **USN Journal** (produktiv), `QFileSystemWatcher` (Prototyp/Test)   
+- UI: Qt (modernes Design)  
 - Systemlast: konfigurierbare Threadpools für Hashing & Delta-Scanner ⚙️
-
-
-## Bedienkomfort & Support 🆘
-- Vorkonfigurierte Profile: „Privat“, „Kreativ“, „Power-User“ ⚡  
-- One-click Backup / Restore 🔄  
-- Hilfeseiten & FAQ im Installer 📖  
-- Optionaler Telemetrie-Opt-in zur Fehleranalyse 📊
-
-
-## Lizenz & Mitmachen 📝
-- Open-Source, **MIT License**. Beiträge willkommen — bitte Issues oder Pull Requests eröffnen. 🤝
-
-
-## Fazit ✅
-identFS ergänzt den Windows Explorer dort, wo zuverlässige Identität, sichere Backups und projektorientierte Organisation gebraucht werden — **ohne den gewohnten Workflow zu ersetzen**.  
-Für Anwender bedeutet das: mehr Sicherheit 🔒, bessere Auffindbarkeit 🔍 und einfache Wiederherstellung 🔄 bei minimalem Aufwand.
