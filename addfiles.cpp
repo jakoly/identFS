@@ -14,6 +14,11 @@
 #include <QString>
 #include <fstream>
 #include <string>
+#include <QCryptographicHash>
+#include <QString>
+#include <QByteArray>
+
+namespace fs = std::filesystem;
 using namespace std;
 
 
@@ -86,27 +91,27 @@ void addFiles::onOkClicked() {
             // --- UUID erzeugen ---
             QUuid uuid = QUuid::createUuid();           // Qt erzeugt UUID
             QString uuidText = uuid.toString();         // String für DB und ADS
+            uuidText.remove(QRegularExpression("[{}]"));
             QString name = QString::fromStdString(getFileNameFromPath(filePath.toStdString()));
             int fileSize = getFileSize(filePath.toStdString());
 
-            // --- Insert in DB ---
-            sqlite3_stmt* stmt;
-            const char* sqlInsert = "INSERT INTO files (file_uuid, last_path, size, active, name) VALUES (?, ?, ?, 1, ?);";
-            int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
-            if (rc != SQLITE_OK) {
-                std::cerr << "Error while preparing statement: " << sqlite3_errmsg(db) << std::endl;
-                continue;
+
+            // --- Hash erzeugen ---
+            std::ifstream in(filePath.toStdString(), std::ios::in | std::ios::binary);
+            if (!in.is_open()) {
+                std::cerr << "Datei konnte nicht geöffnet werden\n";
+                return;
             }
+            std::ostringstream contents;
+            contents << in.rdbuf(); // ganzen Stream einlesen
+            std::string fileContents = contents.str();
 
-            sqlite3_bind_text(stmt, 1, uuidText.toUtf8().constData(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 2, filePath.toUtf8().constData(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_double(stmt, 3, fileSize);
-            sqlite3_bind_text(stmt, 4, name.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+            std::string fileHashStd = hashText(fileContents);
+            QString fileHash = QString::fromStdString(fileHashStd);  // std::string -> QString
+            QByteArray hashUtf8 = fileHash.toUtf8();                  // QByteArray behalten
 
-            if (sqlite3_step(stmt) != SQLITE_DONE)
-                std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
+            qDebug() << "File-Hash: " << fileHash;
 
-            sqlite3_finalize(stmt);
 
             // --- UUID in eigenem ADS speichern ---
             QString uuidStream = filePath + ":IdentFS_UUID";  // ADS-Stream
@@ -119,6 +124,45 @@ void addFiles::onOkClicked() {
             } else {
                 qDebug() << "Fehler beim Öffnen des ADS für" << filePath;
             }
+
+
+            // --- Add Copy to Vault ---
+            QString default_path = "C:/IdentFS/vault/00000000-0000-0000-0000-000000000000";
+            QString currentVaultPath = default_path;
+            std::filesystem::create_directories(default_path.toStdString());
+
+            std::filesystem::path destPath = std::filesystem::path(default_path.toStdString()) / std::filesystem::path(filePath.toStdString()).filename();
+
+            std::filesystem::copy_file(filePath.toStdString(),
+                          destPath,
+                          std::filesystem::copy_options::overwrite_existing);
+
+
+
+            // --- Insert in DB ---
+            sqlite3_stmt* stmt;
+            const char* sqlInsert = "INSERT INTO files (file_uuid, last_path, size, active, name, file_hash, current_vault_path) VALUES (?, ?, ?, 1, ?, ?, ?);";
+            int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
+            if (rc != SQLITE_OK) {
+                std::cerr << "Error while preparing statement: " << sqlite3_errmsg(db) << std::endl;
+                return;
+            }
+
+            sqlite3_bind_text(stmt, 1, uuidText.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, filePath.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_double(stmt, 3, fileSize);
+            sqlite3_bind_text(stmt, 4, name.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 5, hashUtf8.constData(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 6, currentVaultPath.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+
+            if (sqlite3_step(stmt) != SQLITE_DONE)
+                std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
+
+            sqlite3_finalize(stmt);
+
+
+
+            // --- FINISH ---
 
             std::cout << "Datei erfolgreich hinzugefügt: " << name.toStdString() << std::endl;
             QString uuidReaded = readUuidFromFile(filePath);
@@ -151,4 +195,9 @@ QString addFiles::readUuidFromFile(const QString &filePath) {
     }
 
     return QString();
+}
+
+std::string addFiles::hashText(const std::string &inputText) {
+    QByteArray hash = QCryptographicHash::hash(inputText, QCryptographicHash::Sha256);
+    return std::string(hash.toHex());
 }

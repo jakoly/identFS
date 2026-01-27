@@ -12,6 +12,9 @@
 #include <QSettings>
 #include <QDebug>
 #include <QListWidget>
+#include "sha256.h"
+#include <stdio.h>
+#include <string.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
