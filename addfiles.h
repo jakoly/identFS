@@ -20,6 +20,7 @@ public:
     ~addFiles();
     sqlite3* db;   // DB-Pointer
     float getFileSize(const std::string &filename);
+    std::string getFileNameFromPath(const std::string& filePath);
     QStringList files;
 
 private slots:

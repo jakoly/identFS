@@ -55,6 +55,11 @@ float addFiles::getFileSize(const std::string &filename)
     return static_cast<float>(size / 1024); // in KB umrechnen
 }
 
+std::string addFiles::getFileNameFromPath(const std::string& filePath) {
+    std::filesystem::path p(filePath);
+    return p.filename().string(); // gibt nur den Dateinamen zurück
+}
+
 void addFiles::selectFiles()
 {
     files = QFileDialog::getOpenFileNames(
@@ -65,7 +70,8 @@ void addFiles::selectFiles()
         );
     if (!files.isEmpty()) {
         for (const QString &filePath : files) {
-            QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/unkown_file.png"), filePath);
+            QString name = QString::fromStdString(getFileNameFromPath(filePath.toStdString()));
+            QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/unkown_file.png"), name);
             ui->listWidgetFiles->addItem(item);
             qDebug() << "Ausgewählte Datei:" << filePath;
         }
@@ -80,12 +86,12 @@ void addFiles::onOkClicked() {
             // --- UUID erzeugen ---
             QUuid uuid = QUuid::createUuid();           // Qt erzeugt UUID
             QString uuidText = uuid.toString();         // String für DB und ADS
-
+            QString name = QString::fromStdString(getFileNameFromPath(filePath.toStdString()));
             int fileSize = getFileSize(filePath.toStdString());
 
             // --- Insert in DB ---
             sqlite3_stmt* stmt;
-            const char* sqlInsert = "INSERT INTO files (file_uuid, last_path, size, active) VALUES (?, ?, ?, 1);";
+            const char* sqlInsert = "INSERT INTO files (file_uuid, last_path, size, active, name) VALUES (?, ?, ?, 1, ?);";
             int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
             if (rc != SQLITE_OK) {
                 std::cerr << "Error while preparing statement: " << sqlite3_errmsg(db) << std::endl;
@@ -95,6 +101,7 @@ void addFiles::onOkClicked() {
             sqlite3_bind_text(stmt, 1, uuidText.toUtf8().constData(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_text(stmt, 2, filePath.toUtf8().constData(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_double(stmt, 3, fileSize);
+            sqlite3_bind_text(stmt, 4, name.toUtf8().constData(), -1, SQLITE_TRANSIENT);
 
             if (sqlite3_step(stmt) != SQLITE_DONE)
                 std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
@@ -113,7 +120,7 @@ void addFiles::onOkClicked() {
                 qDebug() << "Fehler beim Öffnen des ADS für" << filePath;
             }
 
-            std::cout << "Datei erfolgreich hinzugefügt: " << filePath.toStdString() << std::endl;
+            std::cout << "Datei erfolgreich hinzugefügt: " << name.toStdString() << std::endl;
             QString uuidReaded = readUuidFromFile(filePath);
             qDebug() << "Ausgelesene UUID:" << uuidReaded;
         }

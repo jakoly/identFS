@@ -11,12 +11,15 @@
 #include <QIcon>
 #include <QSettings>
 #include <QDebug>
+#include <QListWidget>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
 }
 QT_END_NAMESPACE
+
+
 
 class MainWindow : public QMainWindow
 {
@@ -39,11 +42,16 @@ public slots:
     void openAddFilesToProject();
     void saveDefaultSettings();
     void updateProjectList();
+    void updateFileList();
     void onProjectItemClicked(QListWidgetItem *item);
+    void onFileClicked(QListWidgetItem *item);
+    void onOkClicked();
     void turnAddProjectInvisible();
+    void loadProjectFiles(const QString &projectUuid);
 
 private:
     Ui::MainWindow *ui;
     std::string guidToString(const GUID& guid);
+    QStringList tempFileUUIDs;
 };
 #endif // MAINWINDOW_H

@@ -12,6 +12,8 @@
 #include <QDebug>
 #include <filesystem>
 #include <ctime>
+#include <QMessageBox>
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -24,7 +26,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
     connect(ui->projectList, &QListWidget::itemClicked, this, &MainWindow::onProjectItemClicked);
+    connect(ui->listWidgetFiles, &QListWidget::itemClicked, this, &MainWindow::onFileClicked);
     connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::turnAddProjectInvisible);
+    connect(ui->pushButtonOk, &QPushButton::clicked, this, &MainWindow::onOkClicked);
+
 
 
 
@@ -38,14 +43,9 @@ MainWindow::MainWindow(QWidget *parent)
         std::cout << "Database opened successfully!" << std::endl;
     }
 
-    //UI-Setup
-    ui->groupNewProject->setVisible(false);
-    ui->groupBoxDescription->setVisible(true);
-    ui->groupNewProject->setStyleSheet("QGroupBox { border: none; }");
-
-
-
-    updateProjectList();
+    // --- UI-Setup ---
+    // Quelle
+    turnAddProjectInvisible();
 }
 
 MainWindow::~MainWindow()
@@ -53,6 +53,7 @@ MainWindow::~MainWindow()
     if(db) sqlite3_close(db);
     delete ui;
 }
+
 
 
 std::string MainWindow::guidToString(const GUID& guid) {
@@ -157,7 +158,7 @@ void MainWindow::saveDefaultSettings()
     QSettings settings("settings.ini", QSettings::IniFormat);
 
     // Werte hartcodiert setzen
-    settings.setValue("user/name", "Jakob");
+    settings.setValue("user/name", "User");
     settings.setValue("app/theme", "light");
     settings.setValue("user/driveLetter", "C");
 
@@ -169,7 +170,48 @@ void MainWindow::saveDefaultSettings()
     qDebug() << "Name:" << name << "Theme:" << theme << "Drive-Letter: " << driveLetter;
 }
 
+void MainWindow::updateFileList() {
+    ui->listWidgetFiles->clear();
+    ui->listWidgetFiles->addItem(new QListWidgetItem("Alle Dateien ⤵️"));
+    ui->listWidgetFilesInProject->clear();
+    ui->listWidgetFilesInProject->addItem(new QListWidgetItem("Projektdateien ⤵️"));
+
+    tempFileUUIDs.clear();
+    qDebug() << tempFileUUIDs << " is empty now";
+    qDebug() << "Update File List";
+
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_prepare_v2(db, "SELECT file_uuid, name, last_path, size, active FROM files;", -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        qDebug() << "SQLite-Fehler";
+        return;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        QString uuid = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        QString name = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)));
+        QString lastPath = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)));
+        QString size = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)));
+        int active = sqlite3_column_int(stmt, 4);
+
+        QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/unkown_file.png"), name);
+
+        QVariantMap data;
+        data["name"] = name;
+        data["uuid"] = uuid;
+        data["lastPath"] = lastPath;
+        data["size"] = size;
+        data["active"] = active;
+
+        item->setData(Qt::UserRole, data);
+        ui->listWidgetFiles->addItem(item);
+    }
+
+    sqlite3_finalize(stmt);
+}
+
 void MainWindow::updateProjectList() {
+
     // QListWidget Item
     ui->projectList->setIconSize(QSize(32, 32));
     QFont font = ui->projectList->font();
@@ -181,7 +223,7 @@ void MainWindow::updateProjectList() {
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, "SELECT project_uuid, name, vault_path, create_date, modification_date FROM projects;", -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
-        // Fehlerbehandlung
+        qDebug() << "sqLite-Fehler";
     }
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         const unsigned char* uuidText = sqlite3_column_text(stmt, 0);
@@ -214,17 +256,27 @@ void MainWindow::updateProjectList() {
 
 void MainWindow::turnAddProjectInvisible() {
     ui->groupNewProject->setVisible(false);
-    ui->groupBoxDescription->setVisible(true);
     projectUUID = "";
     projectName = "";
     projectCreated = "";
     projectModificated = "";
     projectVaultPath = "";
+    tempFileUUIDs.clear();
+
+    ui->groupNewProject->setStyleSheet("QGroupBox { border: none; }");
+    ui->labelProjectName->setText("Willkommen bei identFS!");
+
+    updateFileList();
+    updateProjectList();
+    qDebug() << tempFileUUIDs << " is empty now";
+
     qDebug() << "Kein Projekt ausgewählt.";
 }
 
 void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 {
+    updateFileList();
+
     QVariantMap data = item->data(Qt::UserRole).toMap();
     QString name = data["name"].toString();
     QString uuid = data["uuid"].toString();
@@ -238,12 +290,113 @@ void MainWindow::onProjectItemClicked(QListWidgetItem *item)
     projectModificated = modification_date;
     projectVaultPath = vaultPath;
 
+    loadProjectFiles(projectUUID);
+
     qDebug() << "Item geklickt: " << projectName << " UUID:" << uuid;
 
     ui->groupNewProject->setVisible(true);
-    ui->groupBoxDescription->setVisible(false);
 
     ui->labelProjectName->setText(QString("%1").arg(projectName));
     ui->labelCreated->setText(QString("Projekt erstellt:    %1").arg(projectCreated));
     ui->labelLastChange->setText(QString("Projekt geändert:     %1").arg(projectModificated));
+}
+
+void MainWindow::onFileClicked(QListWidgetItem *item) {
+    QListWidgetItem *newItem = item->clone();
+    ui->listWidgetFilesInProject->addItem(newItem);
+
+    QVariantMap data = item->data(Qt::UserRole).toMap();
+    QString uuid = data["uuid"].toString();
+    tempFileUUIDs.append(uuid);
+    qDebug() << tempFileUUIDs;
+}
+
+void MainWindow::onOkClicked() {
+    const char* sqlInsert =
+        "INSERT INTO file_to_project (file_uuid, project_uuid) VALUES (?, ?);";
+
+    sqlite3_stmt* stmt = nullptr;
+
+    int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK) {
+        qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+        return;
+    }
+
+    for (const QString &fileUUID : tempFileUUIDs) {
+        QByteArray fileUuidUtf8 = fileUUID.toUtf8();
+        QByteArray projectUuidUtf8 = projectUUID.toUtf8();
+
+        sqlite3_bind_text(stmt, 1, fileUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, projectUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            qDebug() << "Insert failed:" << sqlite3_errmsg(db);
+        }
+
+        sqlite3_reset(stmt);
+        sqlite3_clear_bindings(stmt);
+        qDebug() << fileUUID << " was added to " << projectUUID;
+    }
+
+    sqlite3_finalize(stmt);
+
+    QMessageBox::information(
+        this,
+        "Dateien wurden hinzugefügt",
+        "Die Dateien wurden erfolgreich zum Projekt hinzugefügt"
+    );
+
+    turnAddProjectInvisible();
+}
+
+void MainWindow::loadProjectFiles(const QString &projectUuid) {
+    ui->listWidgetFilesInProject->clear(); // vorher leeren
+
+    // 1 Alle file_uuid für das Projekt aus file_to_project holen
+    QStringList fileUUIDs;
+
+    const char* sqlFilesToProject = "SELECT file_uuid FROM file_to_project WHERE project_uuid = ?;";
+    sqlite3_stmt* stmt = nullptr;
+
+    if (sqlite3_prepare_v2(db, sqlFilesToProject, -1, &stmt, nullptr) != SQLITE_OK) {
+        qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+        return;
+    }
+
+    sqlite3_bind_text(stmt, 1, projectUuid.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        QString fileUuid = QString::fromUtf8(
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))
+            );
+        fileUUIDs.append(fileUuid);
+    }
+
+    sqlite3_finalize(stmt);
+
+    // 2️⃣ Für jede file_uuid den Namen aus files holen und Item hinzufügen
+    const char* sqlFileName = "SELECT name FROM files WHERE file_uuid = ?;";
+
+    for (const QString &fileUuid : fileUUIDs) {
+        sqlite3_stmt* stmtName = nullptr;
+        if (sqlite3_prepare_v2(db, sqlFileName, -1, &stmtName, nullptr) != SQLITE_OK) {
+            qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+            continue;
+        }
+
+        sqlite3_bind_text(stmtName, 1, fileUuid.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+
+        if (sqlite3_step(stmtName) == SQLITE_ROW) {
+            QString fileName = QString::fromUtf8(
+                reinterpret_cast<const char*>(sqlite3_column_text(stmtName, 0))
+                );
+
+            // Item erstellen und zum ListWidget hinzufügen
+            QListWidgetItem *item = new QListWidgetItem(fileName);
+            ui->listWidgetFilesInProject->addItem(item);
+        }
+
+        sqlite3_finalize(stmtName);
+    }
 }
