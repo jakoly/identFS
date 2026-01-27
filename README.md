@@ -1,116 +1,56 @@
-# IdentFS
+# identFS
 
-**IdentFS** ist ein Windows-Desktop-System (C++ / Qt), das klassische Dateisysteme erweitert, ohne sie zu ersetzen.  
-Im Mittelpunkt steht **Identität statt Pfad**: Dateien werden über **UUIDs und Metadaten** verwaltet und bleiben auch dann auffindbar, wenn sie außerhalb der Anwendung verschoben, umbenannt oder reorganisiert werden.
-
-IdentFS ist kein Explorer-Klon, sondern eine **autarke, selbstheilende Dateiverwaltungsschicht** mit Projektlogik, ultrastarker Kompression und intelligenter Sicherung.
+**identFS** ist eine leistungsfähige Datei-Management- und Backup-Lösung für Windows, die Dateien eindeutig identifiziert, Änderungen in Echtzeit erkennt und Projekte strukturiert verwaltet. Pfade dienen nur als Cache – die Wahrheit liegt in UUID und Hash.  
 
 ---
 
-## 🔥 Kernidee
+## Features
 
-> **Pfade sind instabil – Identitäten nicht.**
+### Eindeutige Dateiidentifikation
+- Jede Datei erhält eine **UUID** und einen **Hashwert** (BLAKE3 bevorzugt, SHA-256 optional).  
+- Dateien bleiben über Verschiebungen oder Umbenennungen hinweg eindeutig identifizierbar.
 
-Klassische Dateiverwaltung bricht, sobald:
-- Dateien verschoben werden
-- Ordnerstrukturen geändert werden
-- Backups zurückgespielt werden
+### Effiziente Überwachung & Delta-Scan
+- **Delta-Scan** prüft nur geänderte oder neue Dateien.  
+- **USN Journal** erkennt Änderungen in Echtzeit.  
+- Initialer Full-Scan beim Setup erforderlich.  
+- Prototyp: `QFileSystemWatcher` für kleinere Volumes.
 
-IdentFS löst dieses Problem durch:
-- eindeutige Datei-Identitäten (UUID)
-- Metadaten-basierte Wiedererkennung
-- getrennte, spezialisierte Datenbanken
-- kontinuierliche Konsistenzprüfung im Hintergrund
+### Backup & Archivierung
+- **Inkrementelle Backups** für maximale Effizienz.  
+- **Ultrakomprimierte Snapshots** für Speicheroptimierung.  
+- Wiederherstellung über UUID + Hash garantiert Datenintegrität.
 
----
+### Projektbasierte Organisation
+- Logische Gruppierung von Dateien in Projekten.  
+- Warnungen beim Löschen von Dateien, die in Projekten referenziert sind.
 
-## 🧠 Grundprinzipien
+### Datenbanken
+- **File-DB**: uuid, size, hash, last_seen_path, status, last_modified.  
+- **Project-DB**: Projekte und Zuordnung der Dateien.  
+- **Archive-DB**: Snapshots und Backup-Verwaltung.  
+- Optimiert für schnelle Suche und parallele Lese-/Schreibzugriffe.
 
-- **Keine Pfade als Wahrheit**
-- **Autarker Betrieb** (Explorer-Aktionen werden erkannt, nicht verboten)
-- **Trennung von Daten, Beziehungen und Backups**
-- **Kein Vendor-Lock-in**
-- **Alles bleibt normale Dateien auf NTFS**
+### UI (Qt)
+- Vollbild beim Start, Split-View: Projektliste links, Dateien rechts.  
+- Activity-Log für Änderungen, Backups und Warnungen.  
+- Buttons für Projekte, Backups und Status jederzeit sichtbar.
 
----
+### Performance & Threads
+- Delta-Scan im Hintergrund.  
+- Parallele Hash-Berechnung großer Dateien.  
+- SQLite im WAL-Modus für schnelle Lese-/Schreibzugriffe.
 
-## 🧩 Systemarchitektur
-
-### 1️⃣ File-DB (Identitätsdatenbank)
-Speichert **jede relevante Datei** mit:
-
-- UUID (Primärschlüssel)
-- Dateigröße
-- Hash (z. B. BLAKE3 / SHA-256)
-- Zeitstempel
-- optionale NTFS-Metadaten
-- interner Status (aktiv, verschoben, vermisst)
-
-➡ Erkennt Dateien **wieder**, selbst wenn sie:
-- verschoben
-- umbenannt
-- in andere Ordner kopiert werden
-
----
-
-### 2️⃣ Project-DB (Beziehungsdatenbank)
-
-- Projekte mit eigener UUID
-- Viele-zu-Viele-Relation:
-  - Projekt ↔ Dateien
-- Projektmetadaten:
-  - Beschreibung
-  - Tags
-  - Versionen
-
-➡ Eine Datei kann **in mehreren Projekten gleichzeitig existieren**, ohne dupliziert zu werden.
+### Erweiterungsmöglichkeiten
+- Verschlüsselung von Backups.  
+- Plugin-System für neue Dateitypen.  
+- Plattformübergreifende Version (Linux).  
+- Projektübergreifende Duplikat-Erkennung und Versionskontrolle innerhalb von Projekten.
 
 ---
 
-### 3️⃣ Backup- & Archive-DB
+## Installation
 
-- Ultrakomprimierte Sicherungen
-- Versionierte Projekt-Snapshots
-- Inkrementelle Archivstruktur
-- Wiederherstellung **unabhängig vom ursprünglichen Pfad**
-
----
-
-## 🗂 Dateiidentifikation (UUID)
-
-### Wo wird die UUID gespeichert?
-
-**Mehrschichtiges System (Fail-Safe):**
-
-1. **NTFS Alternate Data Stream (ADS)** *(primär)*
-2. **Interne Datenbank**
-3. **Hash-basierte Wiedererkennung** *(Fallback)*
-
-➡ Kein vollständiger Festplatten-Scan nötig  
-➡ Keine Abhängigkeit von Dateipfaden  
-➡ Explorer-Aktionen bleiben erlaubt
-
----
-
-## 🧨 Löschschutz & Warnsystem
-
-Wenn eine Datei:
-- Teil eines Projekts ist
-- in einer Relation steht
-- in einem Archiv referenziert wird
-
-➡ **Warnung vor dem Löschen**
-➡ kein Zwang, aber **informierte Entscheidung**
-
----
-
-## 🧱 Kompression & Archivierung
-
-- Eigener Container (kein ZIP-Wrapper)
-- Fokus:
-  - viele kleine Dateien
-  - redundante Daten
-  - Medien-Workflows
-- Ziel:
-  - **deutlich besser als ZIP**
-  - konkurrenzfähig zu 7z, aber projektbewusst
+1. Repository klonen:  
+```bash
+git clone https://github.com/<username>/identFS.git
