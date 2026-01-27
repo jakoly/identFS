@@ -40,6 +40,7 @@ public slots:
     void saveDefaultSettings();
     void updateProjectList();
     void onProjectItemClicked(QListWidgetItem *item);
+    void turnAddProjectInvisible();
 
 private:
     Ui::MainWindow *ui;

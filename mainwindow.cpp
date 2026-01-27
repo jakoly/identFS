@@ -24,6 +24,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
     connect(ui->projectList, &QListWidget::itemClicked, this, &MainWindow::onProjectItemClicked);
+    connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::turnAddProjectInvisible);
+
 
 
     //----CODE----
@@ -35,6 +37,12 @@ MainWindow::MainWindow(QWidget *parent)
     } else {
         std::cout << "Database opened successfully!" << std::endl;
     }
+
+    //UI-Setup
+    ui->groupNewProject->setVisible(false);
+    ui->groupBoxDescription->setVisible(true);
+    ui->groupNewProject->setStyleSheet("QGroupBox { border: none; }");
+
 
 
     updateProjectList();
@@ -204,6 +212,17 @@ void MainWindow::updateProjectList() {
     sqlite3_finalize(stmt);
 }
 
+void MainWindow::turnAddProjectInvisible() {
+    ui->groupNewProject->setVisible(false);
+    ui->groupBoxDescription->setVisible(true);
+    projectUUID = "";
+    projectName = "";
+    projectCreated = "";
+    projectModificated = "";
+    projectVaultPath = "";
+    qDebug() << "Kein Projekt ausgewählt.";
+}
+
 void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 {
     QVariantMap data = item->data(Qt::UserRole).toMap();
@@ -221,5 +240,10 @@ void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 
     qDebug() << "Item geklickt: " << projectName << " UUID:" << uuid;
 
-    openAddFilesToProject();
+    ui->groupNewProject->setVisible(true);
+    ui->groupBoxDescription->setVisible(false);
+
+    ui->labelProjectName->setText(QString("%1").arg(projectName));
+    ui->labelCreated->setText(QString("Projekt erstellt:    %1").arg(projectCreated));
+    ui->labelLastChange->setText(QString("Projekt geändert:     %1").arg(projectModificated));
 }
