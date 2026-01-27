@@ -13,12 +13,16 @@ class addFilesToProject : public QDialog
     Q_OBJECT
 
 public:
-    explicit addFilesToProject(QWidget *parent = nullptr);
+    explicit addFilesToProject(MainWindow* mw, QWidget *parent = nullptr);
     ~addFilesToProject();
-    void someFunction(MainWindow* mw);
 
 private:
     Ui::addFilesToProject *ui;
+    QString name;
+    QString uuid;
+
+private slots:
+    void onCancelClicked();
 };
 
 #endif // ADDFILESTOPROJECT_H

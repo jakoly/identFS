@@ -2,13 +2,17 @@
 #include <QDebug>
 #include "ui_addfilestoproject.h"
 
-addFilesToProject::addFilesToProject(QWidget *parent)
+addFilesToProject::addFilesToProject(MainWindow* mw, QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::addFilesToProject)
 {
     ui->setupUi(this);
 
+    connect(ui->pushButtonCancel, &QPushButton::clicked, this, &addFilesToProject::onCancelClicked);
 
+    ui->label->setText(QString("Projekt: %1").arg(mw->projectName));
+    ui->labelCreated->setText(QString("Projekt erstellt:    %1").arg(mw->projectCreated));
+    ui->labelLastChange->setText(QString("Projekt geändert:     %1").arg(mw->projectModificated));
 }
 
 addFilesToProject::~addFilesToProject()
@@ -16,11 +20,6 @@ addFilesToProject::~addFilesToProject()
     delete ui;
 }
 
-void addFilesToProject::someFunction(MainWindow* mw)
-{
-    QString name = mw->projectName;
-    QString uuid = mw->projectUUID;
-
-    qDebug() << name << uuid;
+void addFilesToProject::onCancelClicked() {
+    close();
 }
-

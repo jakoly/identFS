@@ -11,6 +11,7 @@
 #include <QSettings>
 #include <QDebug>
 #include <filesystem>
+#include <ctime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -95,10 +96,14 @@ void MainWindow::newProject()
         std::cerr << "Fehler: " << e.what() << std::endl;
     }
 
+    //Generate Timestamp
+    time_t timestamp;
+    time(&timestamp);
+
 
     // Insert in DB
     sqlite3_stmt* stmt;
-    const char* sqlInsert = "INSERT INTO projects (project_uuid, name, vault_path) VALUES (?, ?, ?);";
+    const char* sqlInsert = "INSERT INTO projects (project_uuid, name, vault_path, create_date, modification_date) VALUES (?, ?, ?, ?, ?);";
     int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
     if(rc != SQLITE_OK) {
         std::cerr << "Error while preparing: " << sqlite3_errmsg(db) << std::endl;
@@ -108,6 +113,8 @@ void MainWindow::newProject()
     sqlite3_bind_text(stmt, 1, UUID.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, projectName.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, path.string().c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, ctime(&timestamp), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, ctime(&timestamp), -1, SQLITE_TRANSIENT);
 
     if(sqlite3_step(stmt) != SQLITE_DONE)
         std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
@@ -128,6 +135,11 @@ void MainWindow::openAddFilesWindow()
 {
     // Modelless-Fenster (kann parallel zu MainWindow benutzt werden)
     addFiles *window = new addFiles(this);  // "this" als Parent optional
+    window->show();  // zeigt das Fenster
+}
+
+void MainWindow::openAddFilesToProject() {
+    addFilesToProject *window = new addFilesToProject(this);  // "this" als Parent optional
     window->show();  // zeigt das Fenster
 }
 
@@ -159,7 +171,7 @@ void MainWindow::updateProjectList() {
 
 
     sqlite3_stmt* stmt;
-    int rc = sqlite3_prepare_v2(db, "SELECT project_uuid, name, vault_path FROM projects;", -1, &stmt, nullptr);
+    int rc = sqlite3_prepare_v2(db, "SELECT project_uuid, name, vault_path, create_date, modification_date FROM projects;", -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         // Fehlerbehandlung
     }
@@ -167,13 +179,25 @@ void MainWindow::updateProjectList() {
         const unsigned char* uuidText = sqlite3_column_text(stmt, 0);
         const unsigned char* nameText = sqlite3_column_text(stmt, 1);
         const unsigned char* vaultText = sqlite3_column_text(stmt, 2);
+        const unsigned char* create_dateText = sqlite3_column_text(stmt, 3);
+        const unsigned char* modification_dateText = sqlite3_column_text(stmt, 4);
 
         QString uuid = reinterpret_cast<const char*>(uuidText);
         QString name = reinterpret_cast<const char*>(nameText);
         QString vaultPath = reinterpret_cast<const char*>(vaultText);
+        QString create_date = reinterpret_cast<const char*>(create_dateText);
+        QString modification_date = reinterpret_cast<const char*>(modification_dateText);
 
         QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/project.png"), name);
-        item->setData(Qt::UserRole, uuid);
+        QVariantMap data;
+        data["name"] = name;
+        data["uuid"] = uuid;
+        data["vault_path"] = vaultPath;
+        data["createDate"] = create_date;
+        data["modification_date"] = modification_date;
+
+        item->setData(Qt::UserRole, data);
+
         ui->projectList->addItem(item);
     }
 
@@ -182,13 +206,20 @@ void MainWindow::updateProjectList() {
 
 void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 {
-    QString name = item->text();
-    QString uuid = item->data(Qt::UserRole).toString(); // falls du UUID gespeichert hast
+    QVariantMap data = item->data(Qt::UserRole).toMap();
+    QString name = data["name"].toString();
+    QString uuid = data["uuid"].toString();
+    QString vaultPath = data["vaultPath"].toString();
+    QString createDate = data["createDate"].toString();
+    QString modification_date = data["modification_date"].toString();
 
     projectUUID = uuid;
     projectName = name;
+    projectCreated = createDate;
+    projectModificated = modification_date;
+    projectVaultPath = vaultPath;
 
-    qDebug() << "Item geklickt: " << name << " UUID:" << uuid;
+    qDebug() << "Item geklickt: " << projectName << " UUID:" << uuid;
 
-    // Hier kannst du z.B. das Projekt öffnen oder Details anzeigen
+    openAddFilesToProject();
 }

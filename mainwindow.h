@@ -29,10 +29,14 @@ public:
 
     QString projectName;
     QString projectUUID;
+    QString projectCreated;
+    QString projectModificated;
+    QString projectVaultPath;
 
 public slots:
     void newProject();
     void openAddFilesWindow();
+    void openAddFilesToProject();
     void saveDefaultSettings();
     void updateProjectList();
     void onProjectItemClicked(QListWidgetItem *item);

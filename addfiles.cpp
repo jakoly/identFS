@@ -114,12 +114,10 @@ void addFiles::onOkClicked() {
             }
 
             std::cout << "Datei erfolgreich hinzugefügt: " << filePath.toStdString() << std::endl;
+            QString uuidReaded = readUuidFromFile(filePath);
+            qDebug() << "Ausgelesene UUID:" << uuidReaded;
         }
     }
-
-    QString uuid = readUuidFromFile("C:/Users/Besitzer/Pictures/Camera Roll/logo_2.jpg");
-    qDebug() << "Ausgelesene UUID:" << uuid;
-
 
     close();
 }
