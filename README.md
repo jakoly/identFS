@@ -1,4 +1,5 @@
 # identFS — Die smarte Ergänzung für den Windows Explorer 🗂️✨
+# Nicht fertiggestellt!
 
 **identFS** ist kein Ersatz für den Explorer. Es ist ein leichtgewichtiger, massentauglicher Ergänzungsdienst, der genau da eingreift, wo der Explorer an Grenzen stößt: zuverlässige Identifikation, sichere Backups, projektbasierte Organisation und einfache Wiederherstellung — alles ohne den gewohnten Workflow zu ändern. 🚀
 
