@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include "addfilestoproject.h"
+#include "settings.h"
 #include "addfiles.h"
 #include <QListWidgetItem>
 #include <QFont>
@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <ctime>
 #include <QMessageBox>
+#include <QProcess>
+#include <QSettings>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -20,7 +22,6 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    saveDefaultSettings();
 
     //----Slot-Connection----
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
@@ -29,9 +30,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->listWidgetFiles, &QListWidget::itemClicked, this, &MainWindow::onFileClicked);
     connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::turnAddProjectInvisible);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &MainWindow::onOkClicked);
-
-
-
+    connect(ui->pushButtonRecycle, &QPushButton::clicked, this, &MainWindow::onRecycleClicked);
 
     //----CODE----
     // DB öffnen
@@ -44,7 +43,6 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     // --- UI-Setup ---
-    // Quelle
     turnAddProjectInvisible();
 }
 
@@ -53,8 +51,6 @@ MainWindow::~MainWindow()
     if(db) sqlite3_close(db);
     delete ui;
 }
-
-
 
 std::string MainWindow::guidToString(const GUID& guid) {
     std::stringstream ss;
@@ -147,29 +143,6 @@ void MainWindow::openAddFilesWindow()
     window->show();  // zeigt das Fenster
 }
 
-void MainWindow::openAddFilesToProject() {
-    addFilesToProject *window = new addFilesToProject(this);  // "this" als Parent optional
-    window->show();  // zeigt das Fenster
-}
-
-void MainWindow::saveDefaultSettings()
-{
-    // Pfad + Format bestimmen (INI-Datei im Programmverzeichnis)
-    QSettings settings("settings.ini", QSettings::IniFormat);
-
-    // Werte hartcodiert setzen
-    settings.setValue("user/name", "User");
-    settings.setValue("app/theme", "light");
-    settings.setValue("user/driveLetter", "C");
-
-    // Werte können jederzeit wieder ausgelesen werden
-    QString name = settings.value("user/name").toString();
-    QString theme = settings.value("app/theme").toString();
-    QString driveLetter = settings.value("user/driveLetter").toString();
-
-    qDebug() << "Name:" << name << "Theme:" << theme << "Drive-Letter: " << driveLetter;
-}
-
 void MainWindow::updateFileList() {
     ui->listWidgetFiles->clear();
     ui->listWidgetFiles->addItem(new QListWidgetItem("Alle Dateien ⤵️"));
@@ -237,6 +210,7 @@ void MainWindow::updateProjectList() {
         QString vaultPath = reinterpret_cast<const char*>(vaultText);
         QString create_date = reinterpret_cast<const char*>(create_dateText);
         QString modification_date = reinterpret_cast<const char*>(modification_dateText);
+        qDebug() << vaultPath;
 
         QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/project.png"), name);
         QVariantMap data;
@@ -292,7 +266,7 @@ void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 
     loadProjectFiles(projectUUID);
 
-    qDebug() << "Item geklickt: " << projectName << " UUID:" << uuid;
+    qDebug() << "Item geklickt: " << projectName << " Vault-Path:" << projectVaultPath;
 
     ui->groupNewProject->setVisible(true);
 
@@ -312,13 +286,12 @@ void MainWindow::onFileClicked(QListWidgetItem *item) {
 }
 
 void MainWindow::onOkClicked() {
+    // --- Datenbankeintrag erstellen ---
     const char* sqlInsert =
         "INSERT INTO file_to_project (file_uuid, project_uuid) VALUES (?, ?);";
 
-    sqlite3_stmt* stmt = nullptr;
-
-    int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
-    if (rc != SQLITE_OK) {
+    sqlite3_stmt* stmtInsert = nullptr;
+    if (sqlite3_prepare_v2(db, sqlInsert, -1, &stmtInsert, nullptr) != SQLITE_OK) {
         qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
         return;
     }
@@ -327,25 +300,86 @@ void MainWindow::onOkClicked() {
         QByteArray fileUuidUtf8 = fileUUID.toUtf8();
         QByteArray projectUuidUtf8 = projectUUID.toUtf8();
 
-        sqlite3_bind_text(stmt, 1, fileUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt, 2, projectUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtInsert, 1, fileUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtInsert, 2, projectUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
 
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
+        if (sqlite3_step(stmtInsert) != SQLITE_DONE)
             qDebug() << "Insert failed:" << sqlite3_errmsg(db);
+
+        sqlite3_reset(stmtInsert);
+        sqlite3_clear_bindings(stmtInsert);
+
+        qDebug() << fileUUID << "was added to" << projectUUID;
+
+        // --- Vault-Kopie ---
+        QString lastPath;
+
+        sqlite3_stmt* stmtSelect = nullptr;
+        if (sqlite3_prepare_v2(db,
+                               "SELECT last_path FROM files WHERE file_uuid = ?",
+                               -1,
+                               &stmtSelect, nullptr) == SQLITE_OK) {
+
+            sqlite3_bind_text(stmtSelect, 1, fileUuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+
+            if (sqlite3_step(stmtSelect) == SQLITE_ROW) {
+                const unsigned char* text = sqlite3_column_text(stmtSelect, 0);
+                if (text)
+                    lastPath = QString::fromUtf8(reinterpret_cast<const char*>(text));
+            }
+
+            sqlite3_finalize(stmtSelect);
         }
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
-        qDebug() << fileUUID << " was added to " << projectUUID;
+        if (lastPath.isEmpty()) {
+            qDebug() << "Vault skipped: lastPath empty for" << fileUUID;
+            continue;
+        }
+
+        if (!QFile::exists(lastPath)) {
+            qDebug() << "Vault skipped: file does not exist:" << lastPath;
+            continue;
+        }
+
+        QString tempPath = "C:/IdentFS/vault/" + projectUUID;
+        if (!QDir().mkpath(tempPath)) {
+            qDebug() << "Failed to create vault folder:" << tempPath;
+            continue;
+        }
+
+        QFileInfo fi(lastPath);
+        QString sourceDir = fi.absolutePath();
+        QString fileName  = fi.fileName();
+
+        QStringList args = {
+            sourceDir,
+            tempPath,
+            fileName,
+            "/COPY:DAT", // nur Daten, Attribute, Zeitstempel
+            "/R:0",
+            "/W:0"
+        };
+
+        QProcess proc;
+        proc.start("robocopy", args);
+        proc.waitForFinished(-1);
+
+        int exitCode = proc.exitCode();
+        if (exitCode >= 8) {
+            qDebug() << "Robocopy failed:" << exitCode << "for file:" << fileUUID;
+            continue;
+        }
+
+        qDebug() << fileUUID << "was vaulted!";
     }
 
-    sqlite3_finalize(stmt);
+    sqlite3_finalize(stmtInsert);
 
     QMessageBox::information(
         this,
         "Dateien wurden hinzugefügt",
-        "Die Dateien wurden erfolgreich zum Projekt hinzugefügt"
-    );
+        "Die Dateien wurden erfolgreich zum Projekt hinzugefügt.\nSie sind im Vault gesichert."
+        );
 
     turnAddProjectInvisible();
 }
@@ -398,5 +432,89 @@ void MainWindow::loadProjectFiles(const QString &projectUuid) {
         }
 
         sqlite3_finalize(stmtName);
+    }
+}
+
+void MainWindow::onRecycleClicked() {
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+        this,
+        "Sicherheitsabfrage",
+        "Willst du dieses Projekt wirklich löschen? \n Das Projekt kann nicht wieder herrgestellt werden!",
+        QMessageBox::Yes | QMessageBox::No
+    );
+
+    if (reply == QMessageBox::Yes) {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(
+            this,
+            "Sicherheitsabfrage",
+            "Sicher?????",
+            QMessageBox::Yes | QMessageBox::No
+        );
+
+        if (reply == QMessageBox::Yes) {
+            // --- Datenbankeintrag löschen ---
+            sqlite3_stmt* stmt;
+            const char* sql = "DELETE FROM projects WHERE project_uuid = ?";
+
+            int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+            if (rc != SQLITE_OK) {
+                qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+                return;
+            }
+
+            QByteArray uuidUtf8 = projectUUID.toUtf8();
+            sqlite3_bind_text(stmt, 1, uuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+
+            if (sqlite3_step(stmt) != SQLITE_DONE)
+                qDebug() << "Delete failed:" << sqlite3_errmsg(db);
+
+            sqlite3_finalize(stmt);
+
+            // --- Datenbankeintrag 2 löschen ---
+            sqlite3_stmt* stmt2;
+            const char* sql2 = "DELETE FROM file_to_project WHERE project_uuid = ?";
+
+            int rc2 = sqlite3_prepare_v2(db, sql2, -1, &stmt2, nullptr);
+            if (rc2 != SQLITE_OK) {
+                qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+                return;
+            }
+
+            QByteArray uuidUtf82 = projectUUID.toUtf8();
+            sqlite3_bind_text(stmt2, 1, uuidUtf82.constData(), -1, SQLITE_TRANSIENT);
+
+            if (sqlite3_step(stmt2) != SQLITE_DONE)
+                qDebug() << "Delete failed:" << sqlite3_errmsg(db);
+
+            sqlite3_finalize(stmt2);
+
+
+
+
+
+            qDebug() << "Projekt " << projectUUID << " wurde aus der Datenbank entfernt";
+
+
+            // --- Vault-Ordner löschen ---
+            QString tempPath = "C:/IdentFS/vault/" + projectUUID;
+
+            QDir dir(tempPath);
+            if (!dir.removeRecursively()) {
+                qDebug() << "Ordner konnte nicht vollständig gelöscht werden";
+            }
+            qDebug() << "Projekt " << tempPath << " wurde aus dem Vault gelöscht";
+
+
+
+            turnAddProjectInvisible();
+        } else {
+            turnAddProjectInvisible();
+        }
+
+
+    } else {
+        turnAddProjectInvisible();
     }
 }

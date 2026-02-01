@@ -12,9 +12,6 @@
 #include <QSettings>
 #include <QDebug>
 #include <QListWidget>
-#include "sha256.h"
-#include <stdio.h>
-#include <string.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -42,8 +39,6 @@ public:
 public slots:
     void newProject();
     void openAddFilesWindow();
-    void openAddFilesToProject();
-    void saveDefaultSettings();
     void updateProjectList();
     void updateFileList();
     void onProjectItemClicked(QListWidgetItem *item);
@@ -51,6 +46,7 @@ public slots:
     void onOkClicked();
     void turnAddProjectInvisible();
     void loadProjectFiles(const QString &projectUuid);
+    void onRecycleClicked();
 
 private:
     Ui::MainWindow *ui;
