@@ -16,6 +16,12 @@
 #include <QProcess>
 #include <QSettings>
 #include <fstream>
+#include <QThread>
+#include <QtSql/QSql>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <atomic>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -62,6 +68,10 @@ MainWindow::MainWindow(QWidget *parent)
     std::string tempString;
     std::getline(in, tempString);
     installPath = QString::fromStdString(tempString).trimmed();
+
+    // --- Extra thread ---
+    std::thread worker([this]() { repeatTask(); });
+    worker.detach(); // Optional, wenn du keinen join machen willst
 }
 
 MainWindow::~MainWindow()
@@ -423,7 +433,7 @@ void MainWindow::loadProjectFiles(const QString &projectUuid) {
 
     sqlite3_finalize(stmt);
 
-    // 2️⃣ Für jede file_uuid den Namen aus files holen und Item hinzufügen
+    // 2️ Für jede file_uuid den Namen aus files holen und Item hinzufügen
     const char* sqlFileName = "SELECT name FROM files WHERE file_uuid = ?;";
 
     for (const QString &fileUuid : fileUUIDs) {
@@ -450,91 +460,82 @@ void MainWindow::loadProjectFiles(const QString &projectUuid) {
 }
 
 void MainWindow::onRecycleClicked() {
+    // --- Sicherheitsabfrage 1 ---
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(
         this,
         "Sicherheitsabfrage",
-        "Willst du dieses Projekt wirklich löschen? \n Das Projekt kann nicht wieder herrgestellt werden!",
+        "Willst du dieses Projekt wirklich löschen? \nDas Projekt kann nicht wiederhergestellt werden!",
         QMessageBox::Yes | QMessageBox::No
-    );
-
-    if (reply == QMessageBox::Yes) {
-        QMessageBox::StandardButton reply;
-        reply = QMessageBox::question(
-            this,
-            "Sicherheitsabfrage",
-            "Sicher?????",
-            QMessageBox::Yes | QMessageBox::No
         );
 
-        if (reply == QMessageBox::Yes) {
-            // --- Datenbankeintrag löschen ---
-            sqlite3_stmt* stmt;
-            const char* sql = "DELETE FROM projects WHERE project_uuid = ?";
-
-            int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
-            if (rc != SQLITE_OK) {
-                qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
-                return;
-            }
-
-            QByteArray uuidUtf8 = projectUUID.toUtf8();
-            sqlite3_bind_text(stmt, 1, uuidUtf8.constData(), -1, SQLITE_TRANSIENT);
-
-            if (sqlite3_step(stmt) != SQLITE_DONE)
-                qDebug() << "Delete failed:" << sqlite3_errmsg(db);
-
-            sqlite3_finalize(stmt);
-
-            // --- Datenbankeintrag 2 löschen ---
-            sqlite3_stmt* stmt2;
-            const char* sql2 = "DELETE FROM file_to_project WHERE project_uuid = ?";
-
-            int rc2 = sqlite3_prepare_v2(db, sql2, -1, &stmt2, nullptr);
-            if (rc2 != SQLITE_OK) {
-                qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
-                return;
-            }
-
-            QByteArray uuidUtf82 = projectUUID.toUtf8();
-            sqlite3_bind_text(stmt2, 1, uuidUtf82.constData(), -1, SQLITE_TRANSIENT);
-
-            if (sqlite3_step(stmt2) != SQLITE_DONE)
-                qDebug() << "Delete failed:" << sqlite3_errmsg(db);
-
-            sqlite3_finalize(stmt2);
-
-
-
-
-
-            qDebug() << "Projekt " << projectUUID << " wurde aus der Datenbank entfernt";
-
-
-            // --- Vault-Ordner löschen ---
-            QString tempPath = installPath + "/vault/" + projectUUID;
-
-            QDir dir(tempPath);
-            if (!dir.removeRecursively()) {
-                qDebug() << "Ordner konnte nicht vollständig gelöscht werden";
-            }
-            qDebug() << "Projekt " << tempPath << " wurde aus dem Vault gelöscht";
-
-
-
-            turnAddProjectInvisible();
-        } else {
-            turnAddProjectInvisible();
-        }
-
-
-    } else {
+    if (reply != QMessageBox::Yes) {
         turnAddProjectInvisible();
+        return;
     }
+
+    // --- Sicherheitsabfrage 2 ---
+    reply = QMessageBox::question(
+        this,
+        "Sicherheitsabfrage",
+        "Sicher?????",
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply != QMessageBox::Yes) {
+        turnAddProjectInvisible();
+        return;
+    }
+
+    // --- Datenbankeinträge löschen ---
+    auto deleteProjectEntry = [&](const QString &sqlQuery){
+        sqlite3_stmt* stmt;
+        int rc = sqlite3_prepare_v2(db, sqlQuery.toUtf8().constData(), -1, &stmt, nullptr);
+        if(rc != SQLITE_OK) {
+            qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+            return;
+        }
+        QByteArray uuidUtf8 = projectUUID.toUtf8();
+        sqlite3_bind_text(stmt, 1, uuidUtf8.constData(), -1, SQLITE_TRANSIENT);
+        if(sqlite3_step(stmt) != SQLITE_DONE)
+            qDebug() << "Delete failed:" << sqlite3_errmsg(db);
+        sqlite3_finalize(stmt);
+    };
+
+    deleteProjectEntry("DELETE FROM projects WHERE project_uuid = ?");
+    deleteProjectEntry("DELETE FROM file_to_project WHERE project_uuid = ?");
+
+    qDebug() << "Projekt" << projectUUID << "wurde aus der Datenbank entfernt";
+
+    // --- Vault-Ordner deaktivieren ---
+    const char* sqlUpdateProject = "UPDATE projects SET active = ? WHERE project_uuid = ?;";
+    sqlite3_stmt* stmt = nullptr;
+
+    // Statement vorbereiten
+    if (sqlite3_prepare_v2(db, sqlUpdateProject, -1, &stmt, nullptr) != SQLITE_OK) {
+        qDebug() << "Prepare failed:" << sqlite3_errmsg(db);
+        return;
+    }
+
+    // --- GUI aufräumen ---
+    turnAddProjectInvisible();
 }
 
 void MainWindow::onSettingsClicked() {
     // Modelless-Fenster (kann parallel zu MainWindow benutzt werden)
     settings *window = new settings(this);  // "this" als Parent optional
     window->show();  // zeigt das Fenster
+}
+
+std::atomic<bool> running{true}; // Damit man den Thread stoppen kann
+void MainWindow::repeatTask() {
+    while (running) {
+        // --- Hier kommt dein Code rein ---
+        std::cout << "File/Project update" << std::endl;
+        updateFileList();
+        updateProjectList();
+
+        // 5 Sekunden warten
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
 }

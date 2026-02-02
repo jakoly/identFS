@@ -38,6 +38,8 @@ public:
     QString installPath;
     QStringList tempFileUUIDs;
 
+    void turnAddProjectInvisible();
+
 public slots:
     void newProject();
     void openAddFilesWindow();
@@ -46,10 +48,10 @@ public slots:
     void onProjectItemClicked(QListWidgetItem *item);
     void onFileClicked(QListWidgetItem *item);
     void onOkClicked();
-    void turnAddProjectInvisible();
     void loadProjectFiles(const QString &projectUuid);
     void onRecycleClicked();
     void onSettingsClicked();
+    void repeatTask();
     std::string guidToString(const GUID& guid);
 
 private:

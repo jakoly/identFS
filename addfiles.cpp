@@ -1,5 +1,6 @@
 #include "addfiles.h"
 #include "ui_addfiles.h"
+#include "mainwindow.h"
 #include <QListWidgetItem>
 #include <QFont>
 #include <QIcon>
@@ -204,7 +205,6 @@ void addFiles::onOkClicked() {
 
     close();
 }
-
 
 void addFiles::onCancelClicked() {
     close();
