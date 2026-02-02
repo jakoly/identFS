@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-7b6bf2e3f88f26edd66c.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "IdentFS",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "IdentFS::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-IdentFS-Debug-c4e6748580ddf051781d.json",
+					"name" : "IdentFS",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "IdentFS_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-IdentFS_autogen-Debug-55c789c6c52e9e70c22f.json",
+					"name" : "IdentFS_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "IdentFS_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-IdentFS_autogen_timestamp_deps-Debug-bca96d592bba7f831a83.json",
+					"name" : "IdentFS_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "C:/IdentFS/IdentFS/build/Desktop_Qt_6_9_1_MinGW_64_bit-Debug",
+		"source" : "C:/IdentFS"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 8
+	}
+}
