@@ -33,6 +33,7 @@ private:
     std::string guidToString(const GUID& guid);
     QString readUuidFromFile(const QString &filePath);
     std::string hashText(const std::string &inputText);
+    QString installPath;
 };
 
 #endif // ADDFILES_H

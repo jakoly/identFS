@@ -1,6 +1,9 @@
 #include "settings.h"
 #include "ui_settings.h"
-#include <QSettings>
+#include <fstream>
+#include <QRegularExpression>
+#include <QMessageBox>
+
 
 settings::settings(QWidget *parent)
     : QDialog(parent)
@@ -8,16 +11,20 @@ settings::settings(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // Load settings on startup and set UI elements
-    bool lightMode = loadSettings("lightMode", true, "Appearance").toBool();
-    QString defaultPath = loadSettings("defaultPath", "C:/Users/Default", "Paths").toString();
+    connect(ui->okButton, &QPushButton::clicked, this, &settings::onOkClicked);
+    connect(ui->cancelButton, &QPushButton::clicked, this, &settings::onCancelClicked);
 
-    ui->checkBoxLightmode->setChecked(lightMode);
-    ui->lineEditPath->setText(defaultPath);
-
-    // Connect buttons
-    connect(ui->okButton, &QPushButton::clicked, this, &settings::applySettings);
-    connect(ui->cancelButton, &QPushButton::clicked, this, &settings::reject); // close dialog without saving
+    // Datei wieder einlesen
+    QString filePath = QCoreApplication::applicationDirPath() + "/settings/stdPath.txt";
+    std::ifstream in(filePath.toStdString());
+    if (in.is_open()) {
+        std::string tempString;
+        std::getline(in, tempString);
+        in.close();
+        ui->lineEditStdPath->setPlaceholderText("aktueller Laufwerkbuchstabe: " + QString::fromStdString(tempString).trimmed());
+    } else {
+        qDebug() << "Fehler: Konnte Datei zum Lesen nicht öffnen:" << filePath;
+    }
 }
 
 settings::~settings()
@@ -25,28 +32,52 @@ settings::~settings()
     delete ui;
 }
 
-// Called when OK button is clicked
-void settings::applySettings() {
-    // Save current UI values
-    saveSettings("lightMode", ui->checkBoxLightmode->isChecked(), "Appearance");
-    saveSettings("defaultPath", ui->lineEditPath->text(), "Paths");
-
-    accept(); // close the dialog with "accepted" status
+void settings::loadStdPath() {
+    // Absoluter Pfad zur Datei
+    QString filePath = QCoreApplication::applicationDirPath() + "/settings/stdPath.txt";
+    std::ifstream in(filePath.toStdString());
+    if (in.is_open()) {
+        std::string tempString;
+        std::getline(in, tempString);
+        in.close();
+        ui->lineEditStdPath->setPlaceholderText("aktueller Laufwerkbuchstabe: " + QString::fromStdString(tempString).trimmed());
+    } else {
+        qDebug() << "Fehler: Konnte Datei zum Lesen nicht öffnen:" << filePath;
+    }
 }
 
-// Save a setting in a given group
-void settings::saveSettings(const QString &key, const QVariant &value, const QString &group) {
-    QSettings settings("MyCompany", "MyApp"); // persistent storage
-    settings.beginGroup(group);
-    settings.setValue(key, value);
-    settings.endGroup();
+void settings::onOkClicked() {
+    QString StdPath = ui->lineEditStdPath->text();
+
+    if (StdPath.isEmpty()) {
+        QMessageBox msgBox;
+        msgBox.setText("Bitte gib etwas ein!");
+        msgBox.exec();
+        ui->lineEditStdPath->clear();
+        loadStdPath();
+        return;
+    }
+
+    // Absoluter Pfad zur Datei
+    QString filePath = QCoreApplication::applicationDirPath() + "/settings/stdPath.txt";
+
+    // Datei schreiben
+    std::ofstream out(filePath.toStdString());
+    if (out.is_open()) {
+        out << StdPath.toStdString();
+        out.close();
+    } else {
+        qDebug() << "Fehler: Konnte Datei zum Schreiben nicht öffnen:" << filePath;
+        return;
+    }
+
+    ui->lineEditStdPath->clear();
+
+    // Datei wieder einlesen
+    loadStdPath();
 }
 
-// Load a setting, return defaultValue if not found
-QVariant settings::loadSettings(const QString &key, const QVariant &defaultValue, const QString &group) {
-    QSettings settings("MyCompany", "MyApp");
-    settings.beginGroup(group);
-    QVariant value = settings.value(key, defaultValue);
-    settings.endGroup();
-    return value;
+
+void settings::onCancelClicked() {
+    close();
 }

@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include "settings.h"
 #include "addfiles.h"
+#include "settings.h"
 #include <QListWidgetItem>
 #include <QFont>
 #include <QIcon>
@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QSettings>
+#include <fstream>
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -31,11 +32,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::turnAddProjectInvisible);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &MainWindow::onOkClicked);
     connect(ui->pushButtonRecycle, &QPushButton::clicked, this, &MainWindow::onRecycleClicked);
+    connect(ui->pushButtonSettings, &QPushButton::clicked, this, &MainWindow::onSettingsClicked);
 
-    //----CODE----
-    // DB öffnen
+    //----SQLite DB öffnen----
     db = nullptr;
-    int rc = sqlite3_open("../../identfs.db", &db);
+
+    // DB-Pfad auf EXE-Ordner + "database/identfs.db"
+    QString dbFolder = QCoreApplication::applicationDirPath() + "/database";
+    QString dbPath = dbFolder + "/identfs.db";
+
+    // Sicherstellen, dass der Ordner existiert
+    QDir dir(QCoreApplication::applicationDirPath());
+    if (!dir.exists("database")) {
+        dir.mkdir("database");
+    }
+
+    int rc = sqlite3_open(dbPath.toUtf8().constData(), &db);
     if(rc) {
         std::cerr << "Database can't be opened: " << sqlite3_errmsg(db) << std::endl;
     } else {
@@ -44,6 +56,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     // --- UI-Setup ---
     turnAddProjectInvisible();
+
+    // --- Drive Letter einlesen ---
+    std::ifstream in(QCoreApplication::applicationDirPath().toStdString() + "/settings/stdPath.txt");
+    std::string tempString;
+    std::getline(in, tempString);
+    installPath = QString::fromStdString(tempString).trimmed();
 }
 
 MainWindow::~MainWindow()
@@ -83,13 +101,9 @@ void MainWindow::newProject()
     // --- Vault-Ordner erstellen ---
     std::filesystem::path path;
     try {
-        // Drive Letter direkt aus QSettings
-        QSettings settings("settings.ini", QSettings::IniFormat);
-        QString driveLetter = settings.value("user/driveLetter", "C").toString();
-
         // Pfad zusammensetzen (mit ":" für Windows-Laufwerke)
-        path = std::filesystem::path((driveLetter + ":\\").toStdString())
-                                     / "IdentFS" / "vault" / UUID;
+        path = std::filesystem::path((installPath).toStdString())
+                                     / "vault" / UUID;
 
         // Ordner erstellen
         if (std::filesystem::create_directories(path)) {
@@ -341,7 +355,7 @@ void MainWindow::onOkClicked() {
             continue;
         }
 
-        QString tempPath = "C:/IdentFS/vault/" + projectUUID;
+        QString tempPath = installPath + "/vault/" + projectUUID;
         if (!QDir().mkpath(tempPath)) {
             qDebug() << "Failed to create vault folder:" << tempPath;
             continue;
@@ -498,7 +512,7 @@ void MainWindow::onRecycleClicked() {
 
 
             // --- Vault-Ordner löschen ---
-            QString tempPath = "C:/IdentFS/vault/" + projectUUID;
+            QString tempPath = installPath + "/vault/" + projectUUID;
 
             QDir dir(tempPath);
             if (!dir.removeRecursively()) {
@@ -517,4 +531,10 @@ void MainWindow::onRecycleClicked() {
     } else {
         turnAddProjectInvisible();
     }
+}
+
+void MainWindow::onSettingsClicked() {
+    // Modelless-Fenster (kann parallel zu MainWindow benutzt werden)
+    settings *window = new settings(this);  // "this" als Parent optional
+    window->show();  // zeigt das Fenster
 }

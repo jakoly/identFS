@@ -16,8 +16,8 @@
   <widget class="QPushButton" name="okButton">
    <property name="geometry">
     <rect>
-     <x>220</x>
-     <y>250</y>
+     <x>190</x>
+     <y>240</y>
      <width>75</width>
      <height>24</height>
     </rect>
@@ -29,8 +29,8 @@
   <widget class="QPushButton" name="cancelButton">
    <property name="geometry">
     <rect>
-     <x>310</x>
-     <y>250</y>
+     <x>270</x>
+     <y>240</y>
      <width>75</width>
      <height>24</height>
     </rect>
@@ -39,36 +39,43 @@
     <string>Abbrechen</string>
    </property>
   </widget>
-  <widget class="QLineEdit" name="lineEditPath">
+  <widget class="QLabel" name="labelHeading">
    <property name="geometry">
     <rect>
-     <x>60</x>
-     <y>50</y>
-     <width>113</width>
-     <height>22</height>
+     <x>40</x>
+     <y>30</y>
+     <width>201</width>
+     <height>51</height>
     </rect>
    </property>
-   <property name="text">
-    <string>C:/IdentFS</string>
+   <property name="font">
+    <font>
+     <pointsize>25</pointsize>
+    </font>
    </property>
-   <property name="placeholderText">
-    <string>Installationspfad</string>
+   <property name="text">
+    <string>Einstellungen</string>
    </property>
   </widget>
-  <widget class="QCheckBox" name="checkBoxLightmode">
+  <widget class="QLineEdit" name="lineEditStdPath">
    <property name="geometry">
     <rect>
-     <x>70</x>
-     <y>80</y>
-     <width>81</width>
-     <height>20</height>
+     <x>50</x>
+     <y>91</y>
+     <width>281</width>
+     <height>41</height>
     </rect>
    </property>
-   <property name="text">
-    <string>Lightmode</string>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
    </property>
-   <property name="checked">
-    <bool>true</bool>
+   <property name="inputMask">
+    <string/>
+   </property>
+   <property name="placeholderText">
+    <string>Laufwerkbuchstabe</string>
    </property>
   </widget>
  </widget>

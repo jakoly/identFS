@@ -35,6 +35,8 @@ public:
     QString projectCreated;
     QString projectModificated;
     QString projectVaultPath;
+    QString installPath;
+    QStringList tempFileUUIDs;
 
 public slots:
     void newProject();
@@ -47,10 +49,11 @@ public slots:
     void turnAddProjectInvisible();
     void loadProjectFiles(const QString &projectUuid);
     void onRecycleClicked();
+    void onSettingsClicked();
+    std::string guidToString(const GUID& guid);
 
 private:
     Ui::MainWindow *ui;
-    std::string guidToString(const GUID& guid);
-    QStringList tempFileUUIDs;
+
 };
 #endif // MAINWINDOW_H
