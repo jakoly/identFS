@@ -45,6 +45,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         addfiles.h addfiles.cpp addfiles.ui
         settings.h settings.cpp settings.ui
         settings.cpp settings.h settings.ui
+        introdialog.h introdialog.cpp introdialog.ui
 
 
 

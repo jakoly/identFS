@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "ui_settings.h"
+#include "introdialog.h"
 #include <fstream>
 #include <QRegularExpression>
 #include <QMessageBox>
@@ -13,6 +14,7 @@ settings::settings(QWidget *parent)
 
     connect(ui->okButton, &QPushButton::clicked, this, &settings::onOkClicked);
     connect(ui->cancelButton, &QPushButton::clicked, this, &settings::onCancelClicked);
+    connect(ui->pushButtonShowIntroduction, &QPushButton::clicked, this, &settings::showIntroduction);
 
     // Datei wieder einlesen
     QString filePath = QCoreApplication::applicationDirPath() + "/settings/stdPath.txt";
@@ -80,4 +82,9 @@ void settings::onOkClicked() {
 
 void settings::onCancelClicked() {
     close();
+}
+
+void settings::showIntroduction() {
+    introdialog dlg(this);
+    dlg.exec();
 }

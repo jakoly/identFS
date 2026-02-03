@@ -4,5 +4,12 @@
         <file>icons/project.png</file>
         <file>icons/settings.png</file>
         <file>icons/unkown_file.png</file>
+        <file>icons/question.png</file>
+        <file>icons/file.png</file>
+        <file>icons/in_progress.png</file>
+        <file>icons/locked.png</file>
+        <file>icons/Ident-FS-Logo.ico</file>
+        <file>icons/Ident-FS-Logo_Small.png</file>
+        <file>icons/Ident-FS-Logo_Small_no_bg.png</file>
     </qresource>
 </RCC>

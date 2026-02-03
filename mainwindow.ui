@@ -19,6 +19,10 @@
   <property name="windowTitle">
    <string>Ident FS</string>
   </property>
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/icons/icons/Ident-FS-Logo_Small.png</normaloff>:/icons/icons/Ident-FS-Logo_Small.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QListWidget" name="projectList">
     <property name="geometry">
@@ -256,7 +260,7 @@
      </font>
     </property>
     <property name="text">
-     <string>Projektname</string>
+     <string>Willkommen bei identFS.</string>
     </property>
    </widget>
    <widget class="QListWidget" name="listWidgetFiles">
@@ -287,8 +291,77 @@
      <string>⚙️</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="pushButtonRepareFiles">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>580</x>
+      <y>20</y>
+      <width>181</width>
+      <height>35</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>15</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Dateien reparieren</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelInformation">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>440</y>
+      <width>231</width>
+      <height>171</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>720</x>
+      <y>30</y>
+      <width>60</width>
+      <height>60</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>9</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="pixmap">
+     <pixmap resource="resources.qrc">:/icons/icons/in_progress.png</pixmap>
+    </property>
+    <property name="scaledContents">
+     <bool>true</bool>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignmentFlag::AlignCenter</set>
+    </property>
+    <property name="wordWrap">
+     <bool>false</bool>
+    </property>
+   </widget>
   </widget>
  </widget>
- <resources/>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

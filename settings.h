@@ -19,6 +19,7 @@ public slots:
     void onOkClicked();
     void onCancelClicked();
     void loadStdPath();
+    void showIntroduction();
 
 private:
     Ui::settings *ui;

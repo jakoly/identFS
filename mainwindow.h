@@ -13,6 +13,7 @@
 #include <QDebug>
 #include <QListWidget>
 
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -37,6 +38,7 @@ public:
     QString projectVaultPath;
     QString installPath;
     QStringList tempFileUUIDs;
+    bool firstTimeOpened;
 
     void turnAddProjectInvisible();
 
@@ -52,10 +54,17 @@ public slots:
     void onRecycleClicked();
     void onSettingsClicked();
     void repeatTask();
+    void repaireFiles();
+    void copyWithRobocopy(const QString& currentPath, const QString& lastPath);
+    void startWorkerThread();
+    void pauseWorker();
+    void stopWorker();
+    void resumeWorker();
     std::string guidToString(const GUID& guid);
 
 private:
     Ui::MainWindow *ui;
+    int updateCounter = 0;
 
 };
 #endif // MAINWINDOW_H

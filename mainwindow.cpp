@@ -2,6 +2,8 @@
 #include "./ui_mainwindow.h"
 #include "addfiles.h"
 #include "settings.h"
+#include "introdialog.h"
+
 #include <QListWidgetItem>
 #include <QFont>
 #include <QIcon>
@@ -22,7 +24,14 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include <mutex>
+#include <condition_variable>
 
+std::atomic<bool> running{true};  // Für Stop
+std::atomic<bool> paused{false};  // Für Pause
+
+std::mutex mtx;
+std::condition_variable cv;
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -30,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    //----Slot-Connection----
+    // ---- Slots verbinden ----
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
     connect(ui->projectList, &QListWidget::itemClicked, this, &MainWindow::onProjectItemClicked);
@@ -39,19 +48,15 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &MainWindow::onOkClicked);
     connect(ui->pushButtonRecycle, &QPushButton::clicked, this, &MainWindow::onRecycleClicked);
     connect(ui->pushButtonSettings, &QPushButton::clicked, this, &MainWindow::onSettingsClicked);
+    connect(ui->pushButtonRepareFiles, &QPushButton::clicked, this, &MainWindow::repaireFiles);
 
-    //----SQLite DB öffnen----
+    // ---- SQLite DB öffnen ----
     db = nullptr;
-
-    // DB-Pfad auf EXE-Ordner + "database/identfs.db"
     QString dbFolder = QCoreApplication::applicationDirPath() + "/database";
-    QString dbPath = dbFolder + "/identfs.db";
+    QString dbPath   = dbFolder + "/identfs.db";
 
-    // Sicherstellen, dass der Ordner existiert
     QDir dir(QCoreApplication::applicationDirPath());
-    if (!dir.exists("database")) {
-        dir.mkdir("database");
-    }
+    if (!dir.exists("database")) dir.mkdir("database");
 
     int rc = sqlite3_open(dbPath.toUtf8().constData(), &db);
     if(rc) {
@@ -60,22 +65,36 @@ MainWindow::MainWindow(QWidget *parent)
         std::cout << "Database opened successfully!" << std::endl;
     }
 
-    // --- UI-Setup ---
+    // --- UI vorbereiten ---
     turnAddProjectInvisible();
 
-    // --- Drive Letter einlesen ---
+    // --- Install-Pfad einlesen ---
     std::ifstream in(QCoreApplication::applicationDirPath().toStdString() + "/settings/stdPath.txt");
     std::string tempString;
     std::getline(in, tempString);
     installPath = QString::fromStdString(tempString).trimmed();
 
-    // --- Extra thread ---
-    std::thread worker([this]() { repeatTask(); });
-    worker.detach(); // Optional, wenn du keinen join machen willst
+    // --- Install-Pfad einlesen ---
+    QSettings settings;
+    if (!settings.value("intro/shown", false).toBool()) {
+        //Introduction anzeigen
+        qDebug() << "Show Introd.";
+
+        introdialog dlg(this);
+        dlg.exec();
+
+        QSettings settings;
+        settings.setValue("intro/shown", true);
+    }
+
+
+    // --- Hintergrund-Thread starten ---
+    startWorkerThread();
 }
 
 MainWindow::~MainWindow()
 {
+    stopWorker(); // Thread stoppen
     if(db) sqlite3_close(db);
     delete ui;
 }
@@ -168,6 +187,8 @@ void MainWindow::openAddFilesWindow()
 }
 
 void MainWindow::updateFileList() {
+    updateCounter = updateCounter + 1;
+
     ui->listWidgetFiles->clear();
     ui->listWidgetFiles->addItem(new QListWidgetItem("Alle Dateien ⤵️"));
     ui->listWidgetFilesInProject->clear();
@@ -191,7 +212,74 @@ void MainWindow::updateFileList() {
         QString size = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3)));
         int active = sqlite3_column_int(stmt, 4);
 
-        QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/unkown_file.png"), name);
+        QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/file.png"), name);
+
+        std::fstream file(lastPath.toStdString(), std::ios::in);
+        if (file) {  // Check if stream is successfull
+            qDebug() << "Datei existiert." << updateCounter;
+            item->setFlags(item->flags() | Qt::ItemIsEnabled);
+
+            sqlite3_stmt* stmt;
+            const char* sqlDelete =
+                "DELETE FROM repaire_files WHERE file_uuid = ?;";
+
+            int rc = sqlite3_prepare_v2(db, sqlDelete, -1, &stmt, nullptr);
+            if (rc != SQLITE_OK) {
+                std::cerr << "Prepare failed: "
+                          << sqlite3_errmsg(db) << std::endl;
+                return;
+            }
+
+            QByteArray uuidUtf8 = uuid.toUtf8();
+            sqlite3_bind_text(
+                stmt,
+                1,
+                uuidUtf8.constData(),
+                uuidUtf8.size(),
+                SQLITE_TRANSIENT
+                );
+
+            if (sqlite3_step(stmt) != SQLITE_DONE) {
+                std::cerr << "Delete failed: "
+                          << sqlite3_errmsg(db) << std::endl;
+            } else {
+                if (sqlite3_changes(db) == 0) {
+                    // UUID war NICHT in der Tabelle
+                    std::cout << "UUID not found, nothing deleted\n";
+                } else {
+                    // UUID war vorhanden
+                    std::cout << "UUID deleted successfully\n";
+                }
+            }
+
+            sqlite3_finalize(stmt);
+
+        } else {
+            qDebug() << "Datei existiert nicht.\n" << updateCounter;
+            item->setFlags(item->flags() & ~Qt::ItemIsEnabled);
+            item->setIcon(QIcon(":/icons/icons/question.png"));
+
+            // --- Zur Database hizufügen ---
+
+
+            sqlite3_stmt* stmt;
+            const char* sqlInsert =
+                "INSERT OR IGNORE INTO repaire_files (file_uuid) VALUES (?);";
+
+            int rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
+            if(rc != SQLITE_OK) {
+                std::cerr << "Error while preparing: " << sqlite3_errmsg(db) << std::endl;
+                return;
+            }
+
+            sqlite3_bind_text(stmt, 1, uuid.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+
+            if(sqlite3_step(stmt) != SQLITE_DONE)
+                std::cerr << "Insert failed: " << sqlite3_errmsg(db) << std::endl;
+
+            sqlite3_finalize(stmt);
+
+        }
 
         QVariantMap data;
         data["name"] = name;
@@ -527,15 +615,170 @@ void MainWindow::onSettingsClicked() {
     window->show();  // zeigt das Fenster
 }
 
-std::atomic<bool> running{true}; // Damit man den Thread stoppen kann
-void MainWindow::repeatTask() {
+void MainWindow::repeatTask()
+{
     while (running) {
-        // --- Hier kommt dein Code rein ---
-        std::cout << "File/Project update" << std::endl;
-        updateFileList();
-        updateProjectList();
 
-        // 5 Sekunden warten
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        // -------- Pause / Stop --------
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [] {
+                return !paused || !running;
+            });
+        }
+        if (!running)
+            break;
+
+        // -------- Hintergrund-Logik (KEIN GUI!) --------
+        bool tableIsEmpty = true;
+
+        sqlite3_stmt* stmt = nullptr;
+        const char* sql =
+            "SELECT EXISTS (SELECT 1 FROM repaire_files LIMIT 1);";
+
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                tableIsEmpty = (sqlite3_column_int(stmt, 0) == 0);
+            }
+            sqlite3_finalize(stmt);
+        }
+
+        // -------- GUI-Update IM GUI-THREAD --------
+        QMetaObject::invokeMethod(
+            this,
+            [this, tableIsEmpty]() {
+                qDebug() << "File/Project update";
+
+                updateFileList();
+                updateProjectList();
+
+                ui->pushButtonRepareFiles->setEnabled(!tableIsEmpty);
+            },
+            Qt::QueuedConnection
+            );
+
+        // -------- 5 Sekunden warten (reaktiv) --------
+        for (int i = 0; i < 50; ++i) {   // 50 × 100 ms
+            if (!running)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
     }
+}
+
+void MainWindow::repaireFiles() {
+    sqlite3_stmt* stmtOuter;
+    int rc = sqlite3_prepare_v2(db, "SELECT file_uuid FROM repaire_files;", -1, &stmtOuter, nullptr);
+    if (rc != SQLITE_OK) {
+        qDebug() << "SQLite-Fehler bei repaire_files";
+        return;
+    }
+
+    while ((rc = sqlite3_step(stmtOuter)) == SQLITE_ROW) {
+        QString file_uuid = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmtOuter, 0)));
+
+        // Inneres Statement: current_vault_path und last_path abfragen
+        sqlite3_stmt* stmtInner;
+        rc = sqlite3_prepare_v2(db,
+                                "SELECT current_vault_path, last_path FROM files WHERE file_uuid=?",
+                                -1, &stmtInner, nullptr);
+        if (rc != SQLITE_OK) {
+            qDebug() << "SQLite-Fehler bei files";
+            continue;
+        }
+
+        // Bind den file_uuid Wert
+        sqlite3_bind_text(stmtInner, 1, file_uuid.toUtf8().constData(), -1, SQLITE_TRANSIENT);
+
+        if ((rc = sqlite3_step(stmtInner)) == SQLITE_ROW) {
+            QString currentPath = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmtInner, 0)));
+            QString lastPath    = QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(stmtInner, 1)));
+
+            qDebug() << "UUID:" << file_uuid << "currentPath:" << currentPath << "lastPath:" << lastPath;
+
+            copyWithRobocopy(currentPath, lastPath);
+
+            qDebug() << "Die Datei " << file_uuid << " wurde erfolgreich nach " << lastPath << "kopiert";
+        }
+
+        sqlite3_finalize(stmtInner); // wichtig
+    }
+
+    sqlite3_finalize(stmtOuter);
+}
+
+void MainWindow::copyWithRobocopy(const QString& currentPath, const QString& lastPath) {
+    QFileInfo srcInfo(currentPath);
+    QFileInfo dstInfo(lastPath);
+
+    if (!srcInfo.exists()) {
+        qDebug() << "Source file does not exist:" << currentPath;
+        return;
+    }
+
+    QDir().mkpath(dstInfo.absolutePath()); // Zielordner erstellen
+
+    QProcess proc;
+    QStringList args;
+    args << srcInfo.absolutePath().replace("/", "\\")       // Quellordner
+         << dstInfo.absolutePath().replace("/", "\\")       // Zielordner
+         << srcInfo.fileName()                               // Datei
+         << "/COPY:DAT"                                     // Daten, Attribute, Zeitstempel
+         << "/R:0" << "/W:0";
+
+    proc.start("robocopy", args);
+    proc.waitForFinished(-1);
+
+    QString output = proc.readAllStandardOutput();
+    qDebug() << output;
+}
+
+void MainWindow::startWorkerThread() {
+    std::thread([this]() {
+        while (running) {
+            // --- Pause ---
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                cv.wait(lock, [](){ return !paused || !running; });
+            }
+            if (!running) break;
+
+            // --- DB-Check ---
+            bool tableIsEmpty = true;
+            sqlite3_stmt* stmt;
+            const char* sql = "SELECT EXISTS (SELECT 1 FROM repaire_files LIMIT 1);";
+            if(sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                if(sqlite3_step(stmt) == SQLITE_ROW)
+                    tableIsEmpty = (sqlite3_column_int(stmt, 0) == 0);
+                sqlite3_finalize(stmt);
+            }
+
+            // --- GUI-Updates ---
+            QMetaObject::invokeMethod(this, [this, tableIsEmpty](){
+                ui->pushButtonRepareFiles->setEnabled(!tableIsEmpty);
+                updateFileList();
+                updateProjectList();
+            }, Qt::QueuedConnection);
+
+            // --- Intervall 5 Sekunden mit schneller Reaktion auf Pause/Stop ---
+            for(int i = 0; i < 50; ++i) {
+                if(!running) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+    }).detach();
+}
+
+void MainWindow::pauseWorker() {
+    paused = true;
+}
+
+void MainWindow::resumeWorker() {
+    paused = false;
+    cv.notify_all();
+}
+
+void MainWindow::stopWorker() {
+    running = false;
+    cv.notify_all();
 }

@@ -41,7 +41,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Durch das Hinzufügen von Dateien, können sie diese zu ihren Projekten hinzufügen. Die Dateien werden außerdem durch eineultra-komprimierte&lt;span style=&quot; font-weight:700;&quot;&gt; BackUp-Version &lt;/span&gt;gesichert, ega, ob sie die Dateien löschen. Die BackUp-Versionen wird weiterhin für den gewählten Zeitraum aufbewahrt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Durch das Hinzufügen von Dateien, können sie diese zu ihren Projekten hinzufügen. Die Dateien werden außerdem durch eine&lt;span style=&quot; font-weight:700;&quot;&gt; BackUp-Version &lt;/span&gt;gesichert. Egal ob sie also die Dateien löschen, die BackUp-Versionen wird weiterhin aufbewahrt.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="textFormat">
     <enum>Qt::TextFormat::AutoText</enum>

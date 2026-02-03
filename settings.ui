@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>400</width>
+    <width>434</width>
     <height>300</height>
    </rect>
   </property>
@@ -16,21 +16,21 @@
   <widget class="QPushButton" name="okButton">
    <property name="geometry">
     <rect>
-     <x>190</x>
-     <y>240</y>
+     <x>340</x>
+     <y>100</y>
      <width>75</width>
      <height>24</height>
     </rect>
    </property>
    <property name="text">
-    <string>OK</string>
+    <string>Speichern</string>
    </property>
   </widget>
   <widget class="QPushButton" name="cancelButton">
    <property name="geometry">
     <rect>
-     <x>270</x>
-     <y>240</y>
+     <x>340</x>
+     <y>250</y>
      <width>75</width>
      <height>24</height>
     </rect>
@@ -76,6 +76,26 @@
    </property>
    <property name="placeholderText">
     <string>Laufwerkbuchstabe</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="pushButtonShowIntroduction">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>240</y>
+     <width>121</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: #00f;
+background-color: rgba(255, 255, 255, 0)</string>
+   </property>
+   <property name="text">
+    <string>Einführung anzeigen</string>
+   </property>
+   <property name="flat">
+    <bool>true</bool>
    </property>
   </widget>
  </widget>
