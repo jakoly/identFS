@@ -1,22 +1,26 @@
+// Local/Project headers
 #include "addfiles.h"
 #include "ui_addfiles.h"
-#include "mainwindow.h"
-#include <QListWidgetItem>
+
+// Qt headers
+#include <QByteArray>
+#include <QCryptographicHash>
+#include <QDebug>
 #include <QFont>
 #include <QIcon>
+#include <QListWidgetItem>
+#include <QMessageBox>
+#include <QSettings>
+#include <QString>
+#include <QUuid>
+#include <QTextStream>
+
+// C++ Standard Library headers
+#include <fstream>
 #include <iostream>
 #include <sstream>
-#include <QSettings>
-#include <QDebug>
-#include <QTextStream>
-#include <QUuid>
-#include <QString>
-#include <fstream>
 #include <string>
-#include <QCryptographicHash>
-#include <QString>
-#include <QByteArray>
-#include <QMessageBox>
+
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -31,8 +35,6 @@ addFiles::addFiles(QWidget *parent)
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &addFiles::selectFiles);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &addFiles::onOkClicked);
     connect(ui->pushButtonCancel, &QPushButton::clicked, this, &addFiles::onCancelClicked);
-
-
 
 
     //open DB
@@ -61,16 +63,16 @@ addFiles::~addFiles()
 float addFiles::getFileSize(const std::string &filename)
 {
     std::ifstream in(filename.c_str(), std::ios::binary);
-    if (!in) return 0; // Datei konnte nicht geöffnet werden
+    if (!in) return 0; // File can't be opened
 
-    in.seekg(0, std::ios::end);        // ans Ende der Datei springen
-    std::streampos size = in.tellg();  // Position = Dateigröße in Bytes
-    return static_cast<float>(size / 1024); // in KB umrechnen
+    in.seekg(0, std::ios::end);        // go to the file end
+    std::streampos size = in.tellg();  // Position = file size in bytes
+    return static_cast<float>(size / 1024); // calculate to kb
 }
 
 std::string addFiles::getFileNameFromPath(const std::string& filePath) {
     std::filesystem::path p(filePath);
-    return p.filename().string(); // gibt nur den Dateinamen zurück
+    return p.filename().string(); // return filename
 }
 
 void addFiles::selectFiles()
@@ -86,28 +88,28 @@ void addFiles::selectFiles()
             QString name = QString::fromStdString(getFileNameFromPath(filePath.toStdString()));
             QListWidgetItem *item = new QListWidgetItem(QIcon(":/icons/icons/unkown_file.png"), name);
             ui->listWidgetFiles->addItem(item);
-            qDebug() << "Ausgewählte Datei:" << filePath;
+            qDebug() << "File:" << filePath;
         }
     }
 }
 
 void addFiles::onOkClicked() {
-    qDebug() << "OK gedrueckt!";
+    qDebug() << "OK button pushed!";
 
     if (!files.isEmpty()) {
         for (const QString &filePath : files) {
-            // --- UUID erzeugen ---
+            // --- generate UUID ---
             QUuid uuid = QUuid::createUuid();
             QString uuidText = uuid.toString();
             uuidText.remove(QRegularExpression("[{}]"));
             QString name = QString::fromStdString(getFileNameFromPath(filePath.toStdString()));
             int fileSize = getFileSize(filePath.toStdString());
 
-            // --- Hash erzeugen ---
+            // --- create hash ---
             std::ifstream in(filePath.toStdString(), std::ios::in | std::ios::binary);
             if (!in.is_open()) {
-                std::cerr << "Datei konnte nicht geöffnet werden\n";
-                continue; // nächste Datei
+                std::cerr << "\n";
+                continue; // next file
             }
             std::ostringstream contents;
             contents << in.rdbuf();
@@ -119,13 +121,13 @@ void addFiles::onOkClicked() {
 
             qDebug() << "File-Hash: " << fileHash;
 
-            // --- Prüfen, ob Datei schon in DB ist ---
+            // --- Check if file is in db ---
             sqlite3_stmt* checkStmt;
             const char* sqlCheck = "SELECT COUNT(*) FROM files WHERE file_hash = ?;";
             int rcCheck = sqlite3_prepare_v2(db, sqlCheck, -1, &checkStmt, nullptr);
             if (rcCheck != SQLITE_OK) {
                 std::cerr << "Error preparing check statement: " << sqlite3_errmsg(db) << std::endl;
-                continue; // nächste Datei
+                continue; // next file
             }
 
             sqlite3_bind_text(checkStmt, 1, hashUtf8.constData(), -1, SQLITE_TRANSIENT);
@@ -142,38 +144,52 @@ void addFiles::onOkClicked() {
             sqlite3_finalize(checkStmt);
 
             if (alreadyExists) {
-                qDebug() << "Datei wurde bereits hinzugefügt: " << filePath;
+                qDebug() << "File has already been added: " << filePath;
                 QMessageBox::information(
-                    this,                                // Parent-Widget, meist "this"
-                    "Datei bereits hinzugefügt",          // Titel des Fensters
-                    QString("Die Datei '%1' wurde bereits hinzugefügt.").arg(filePath)  // Nachricht
+                    this,
+                    tr("Datei bereits hinzugefügt"),
+                    QString(tr("Die Datei '%1' wurde bereits hinzugefügt.")).arg(filePath)
                     );
                 continue;
             }
 
-            // --- UUID in eigenem ADS speichern ---
+            // --- Store UUID in separate ADS ---
             QString uuidStream = filePath + ":IdentFS_UUID";
             QFile file(uuidStream);
             if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
                 QTextStream out(&file);
                 out << "UUID=" << uuidText;
                 file.close();
-                qDebug() << "UUID geschrieben:" << uuidText;
+                qDebug() << "UUID written:" << uuidText;
             } else {
-                qDebug() << "Fehler beim Öffnen des ADS für" << filePath;
+                qDebug() << "Error opening ADS for" << filePath;
             }
 
-            // --- Add Copy to Vault ---
-            QString default_path = installPath + "/vault/00000000-0000-0000-0000-000000000000";
-            std::filesystem::create_directories(default_path.toStdString());
+            QString defaultPath = QDir(installPath)
+                                      .filePath("vault/00000000-0000-0000-0000-000000000000");
 
-            std::filesystem::path destPath = std::filesystem::path(default_path.toStdString()) / std::filesystem::path(filePath.toStdString()).filename();
+            defaultPath = QDir::cleanPath(defaultPath);
+            QDir().mkpath(defaultPath);
 
-            std::filesystem::copy_file(filePath.toStdString(),
-                                       destPath,
-                                       std::filesystem::copy_options::overwrite_existing);
+            std::filesystem::path srcPath  = filePath.toStdWString();
+            std::filesystem::path destPath =
+                std::filesystem::path(defaultPath.toStdWString()) / srcPath.filename();
 
-            QString currentVaultPath = default_path;
+            try {
+                if (!std::filesystem::equivalent(srcPath, destPath)) {
+                    std::filesystem::copy_file(
+                        srcPath,
+                        destPath,
+                        std::filesystem::copy_options::overwrite_existing
+                        );
+                }
+            } catch (const std::filesystem::filesystem_error& e) {
+                qCritical() << "Vault copy failed:" << e.what();
+            }
+
+
+            QString currentVaultPath = defaultPath;
+
 
             // --- Insert in DB ---
             sqlite3_stmt* stmt;
@@ -197,9 +213,9 @@ void addFiles::onOkClicked() {
             sqlite3_finalize(stmt);
 
             // --- FINISH ---
-            std::cout << "Datei erfolgreich hinzugefügt: " << name.toStdString() << std::endl;
+            std::cout << "File added successfully: " << name.toStdString() << std::endl;
             QString uuidReaded = readUuidFromFile(filePath);
-            qDebug() << "Ausgelesene UUID:" << uuidReaded;
+            qDebug() << "Extracted UUID:" << uuidReaded;
         }
     }
 
@@ -214,7 +230,7 @@ QString addFiles::readUuidFromFile(const QString &filePath) {
     QString adsPath = filePath + ":IdentFS_UUID";  // ADS-Pfad
     QFile file(adsPath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qDebug() << "Fehler beim Öffnen des ADS für" << filePath;
+        qDebug() << "Error opening ADS for" << filePath;
         return QString();
     }
 
@@ -222,9 +238,8 @@ QString addFiles::readUuidFromFile(const QString &filePath) {
     QString line = in.readLine();
     file.close();
 
-    // Annahme: Zeile hat Format "UUID=<uuid>"
     if (line.startsWith("UUID=")) {
-        return line.mid(5); // alles nach "UUID="
+        return line.mid(5);
     }
 
     return QString();

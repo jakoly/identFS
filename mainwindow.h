@@ -1,17 +1,23 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <windows.h>
+// System/Standard headers
 #include <objbase.h>
 #include <string>
-#include "libs/sqlite/sqlite3.h"
-#include <QListWidgetItem>
+#include <windows.h>
+
+// Qt headers
+#include <QDebug>
 #include <QFont>
 #include <QIcon>
-#include <QSettings>
-#include <QDebug>
 #include <QListWidget>
+#include <QListWidgetItem>
+#include <QMainWindow>
+#include <QSettings>
+
+// Project/Local headers
+#include "libs/sqlite/sqlite3.h"
+
 
 
 QT_BEGIN_NAMESPACE
@@ -29,7 +35,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-    sqlite3* db;   // DB-Pointer
+    sqlite3* db;
 
     QString projectName;
     QString projectUUID;
@@ -60,6 +66,8 @@ public slots:
     void pauseWorker();
     void stopWorker();
     void resumeWorker();
+    void createSetting();
+    void onCancelClicked();
     std::string guidToString(const GUID& guid);
 
 private:

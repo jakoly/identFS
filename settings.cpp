@@ -1,9 +1,15 @@
+// Local/Project headers
+#include "introdialog.h"
 #include "settings.h"
 #include "ui_settings.h"
-#include "introdialog.h"
-#include <fstream>
-#include <QRegularExpression>
+
+// Qt headers
 #include <QMessageBox>
+#include <QRegularExpression>
+
+// C++ Standard Library headers
+#include <fstream>
+
 
 
 settings::settings(QWidget *parent)
@@ -42,7 +48,7 @@ void settings::loadStdPath() {
         std::string tempString;
         std::getline(in, tempString);
         in.close();
-        ui->lineEditStdPath->setPlaceholderText("aktueller Laufwerkbuchstabe: " + QString::fromStdString(tempString).trimmed());
+        ui->lineEditStdPath->setPlaceholderText(tr("aktueller Laufwerkbuchstabe: ") + QString::fromStdString(tempString).trimmed());
     } else {
         qDebug() << "Fehler: Konnte Datei zum Lesen nicht öffnen:" << filePath;
     }
@@ -53,7 +59,7 @@ void settings::onOkClicked() {
 
     if (StdPath.isEmpty()) {
         QMessageBox msgBox;
-        msgBox.setText("Bitte gib etwas ein!");
+        msgBox.setText(tr("Bitte gib etwas ein!"));
         msgBox.exec();
         ui->lineEditStdPath->clear();
         loadStdPath();

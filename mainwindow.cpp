@@ -1,31 +1,34 @@
-#include "mainwindow.h"
-#include "./ui_mainwindow.h"
+// Local/Project headers
 #include "addfiles.h"
-#include "settings.h"
 #include "introdialog.h"
+#include "mainwindow.h"
+#include "settings.h"
+#include "./ui_mainwindow.h"
 
-#include <QListWidgetItem>
+// Qt headers
+#include <QDebug>
 #include <QFont>
 #include <QIcon>
-#include <iostream>
-#include <sstream>
-#include <iomanip>
-#include <QSettings>
-#include <QDebug>
-#include <filesystem>
-#include <ctime>
+#include <QListWidgetItem>
 #include <QMessageBox>
 #include <QProcess>
 #include <QSettings>
-#include <fstream>
 #include <QThread>
 #include <QtSql/QSql>
-#include <iostream>
-#include <thread>
-#include <chrono>
+
+// C++ Standard Library headers
 #include <atomic>
-#include <mutex>
+#include <chrono>
 #include <condition_variable>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <mutex>
+#include <sstream>
+#include <thread>
+#include <ctime>
+
 
 std::atomic<bool> running{true};  // Für Stop
 std::atomic<bool> paused{false};  // Für Pause
@@ -39,18 +42,18 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    // ---- Slots verbinden ----
+    // ---- Connect slots ----
     connect(ui->pushButtonCreateProject, &QPushButton::clicked, this, &MainWindow::newProject);
     connect(ui->pushButtonAddFiles, &QPushButton::clicked, this, &MainWindow::openAddFilesWindow);
     connect(ui->projectList, &QListWidget::itemClicked, this, &MainWindow::onProjectItemClicked);
     connect(ui->listWidgetFiles, &QListWidget::itemClicked, this, &MainWindow::onFileClicked);
-    connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::turnAddProjectInvisible);
+    connect(ui->pushButtonCancel, &QPushButton::clicked, this, &MainWindow::onCancelClicked);
     connect(ui->pushButtonOk, &QPushButton::clicked, this, &MainWindow::onOkClicked);
     connect(ui->pushButtonRecycle, &QPushButton::clicked, this, &MainWindow::onRecycleClicked);
     connect(ui->pushButtonSettings, &QPushButton::clicked, this, &MainWindow::onSettingsClicked);
     connect(ui->pushButtonRepareFiles, &QPushButton::clicked, this, &MainWindow::repaireFiles);
 
-    // ---- SQLite DB öffnen ----
+    // ---- open SQLite DB ----
     db = nullptr;
     QString dbFolder = QCoreApplication::applicationDirPath() + "/database";
     QString dbPath   = dbFolder + "/identfs.db";
@@ -65,18 +68,17 @@ MainWindow::MainWindow(QWidget *parent)
         std::cout << "Database opened successfully!" << std::endl;
     }
 
-    // --- UI vorbereiten ---
+    // --- prepare UI ---
     turnAddProjectInvisible();
 
-    // --- Install-Pfad einlesen ---
+    // --- read Install-Pfad ---
     std::ifstream in(QCoreApplication::applicationDirPath().toStdString() + "/settings/stdPath.txt");
     std::string tempString;
     std::getline(in, tempString);
     installPath = QString::fromStdString(tempString).trimmed();
 
-    // --- Install-Pfad einlesen ---
     QSettings settings;
-    if (!settings.value("intro/shown", false).toBool()) {
+    if (settings.value("intro/shown", false).toBool()) {
         //Introduction anzeigen
         qDebug() << "Show Introd.";
 
@@ -88,13 +90,13 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
 
-    // --- Hintergrund-Thread starten ---
+    // --- start Background-Thread ---
     startWorkerThread();
 }
 
 MainWindow::~MainWindow()
 {
-    stopWorker(); // Thread stoppen
+    stopWorker();
     if(db) sqlite3_close(db);
     delete ui;
 }
@@ -117,7 +119,7 @@ void MainWindow::newProject()
     std::string projectName = projectNameInput.toStdString();
     if(projectName.empty()) return;
 
-    // UUID erzeugen
+    // generate UUID
     GUID guid;
     if (CoCreateGuid(&guid) != S_OK) {
         std::cerr << "Error while creating the uuid!" << std::endl;
@@ -190,9 +192,9 @@ void MainWindow::updateFileList() {
     updateCounter = updateCounter + 1;
 
     ui->listWidgetFiles->clear();
-    ui->listWidgetFiles->addItem(new QListWidgetItem("Alle Dateien ⤵️"));
+    ui->listWidgetFiles->addItem(new QListWidgetItem(tr("Alle Dateien ⤵️")));
     ui->listWidgetFilesInProject->clear();
-    ui->listWidgetFilesInProject->addItem(new QListWidgetItem("Projektdateien ⤵️"));
+    ui->listWidgetFilesInProject->addItem(new QListWidgetItem(tr("Projektdateien ⤵️")));
 
     tempFileUUIDs.clear();
     qDebug() << tempFileUUIDs << " is empty now";
@@ -350,7 +352,7 @@ void MainWindow::turnAddProjectInvisible() {
     tempFileUUIDs.clear();
 
     ui->groupNewProject->setStyleSheet("QGroupBox { border: none; }");
-    ui->labelProjectName->setText("Willkommen bei identFS!");
+    ui->labelProjectName->setText(tr("Willkommen bei identFS!"));
 
     updateFileList();
     updateProjectList();
@@ -362,6 +364,7 @@ void MainWindow::turnAddProjectInvisible() {
 void MainWindow::onProjectItemClicked(QListWidgetItem *item)
 {
     updateFileList();
+    pauseWorker();
 
     QVariantMap data = item->data(Qt::UserRole).toMap();
     QString name = data["name"].toString();
@@ -383,8 +386,8 @@ void MainWindow::onProjectItemClicked(QListWidgetItem *item)
     ui->groupNewProject->setVisible(true);
 
     ui->labelProjectName->setText(QString("%1").arg(projectName));
-    ui->labelCreated->setText(QString("Projekt erstellt:    %1").arg(projectCreated));
-    ui->labelLastChange->setText(QString("Projekt geändert:     %1").arg(projectModificated));
+    ui->labelCreated->setText(QString(tr("Projekt erstellt:    %1")).arg(projectCreated));
+    ui->labelLastChange->setText(QString(tr("Projekt geändert:     %1")).arg(projectModificated));
 }
 
 void MainWindow::onFileClicked(QListWidgetItem *item) {
@@ -489,11 +492,17 @@ void MainWindow::onOkClicked() {
 
     QMessageBox::information(
         this,
-        "Dateien wurden hinzugefügt",
-        "Die Dateien wurden erfolgreich zum Projekt hinzugefügt.\nSie sind im Vault gesichert."
+        tr("Dateien wurden hinzugefügt"),
+        tr("Die Dateien wurden erfolgreich zum Projekt hinzugefügt.\nSie sind im Vault gesichert.")
         );
 
     turnAddProjectInvisible();
+    resumeWorker();
+}
+
+void MainWindow::onCancelClicked() {
+    turnAddProjectInvisible();
+    resumeWorker();
 }
 
 void MainWindow::loadProjectFiles(const QString &projectUuid) {
@@ -552,8 +561,8 @@ void MainWindow::onRecycleClicked() {
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(
         this,
-        "Sicherheitsabfrage",
-        "Willst du dieses Projekt wirklich löschen? \nDas Projekt kann nicht wiederhergestellt werden!",
+        tr("Sicherheitsabfrage"),
+        tr("Willst du dieses Projekt wirklich löschen? \nDas Projekt kann nicht wiederhergestellt werden!"),
         QMessageBox::Yes | QMessageBox::No
         );
 
@@ -565,8 +574,8 @@ void MainWindow::onRecycleClicked() {
     // --- Sicherheitsabfrage 2 ---
     reply = QMessageBox::question(
         this,
-        "Sicherheitsabfrage",
-        "Sicher?????",
+        tr("Sicherheitsabfrage"),
+        tr("Wirklich sicher?????"),
         QMessageBox::Yes | QMessageBox::No
         );
 
@@ -607,6 +616,8 @@ void MainWindow::onRecycleClicked() {
 
     // --- GUI aufräumen ---
     turnAddProjectInvisible();
+    updateFileList();
+    updateProjectList();
 }
 
 void MainWindow::onSettingsClicked() {
@@ -651,6 +662,7 @@ void MainWindow::repeatTask()
 
                 updateFileList();
                 updateProjectList();
+                loadProjectFiles(projectUUID);
 
                 ui->pushButtonRepareFiles->setEnabled(!tableIsEmpty);
             },
@@ -770,15 +782,59 @@ void MainWindow::startWorkerThread() {
 }
 
 void MainWindow::pauseWorker() {
+    qDebug() << "Worker paused";
     paused = true;
 }
 
 void MainWindow::resumeWorker() {
+    qDebug() << "Worker resumed";
     paused = false;
     cv.notify_all();
 }
 
 void MainWindow::stopWorker() {
+    qDebug() << "Worker stoped";
     running = false;
     cv.notify_all();
 }
+
+void MainWindow::createSetting() {
+    const char* sql =
+        "CREATE TABLE IF NOT EXISTS file_to_project ("
+        "file_uuid TEXT NOT NULL,"
+        "project_uuid TEXT NOT NULL"
+        ");"
+
+        "CREATE TABLE IF NOT EXISTS files ("
+        "file_uuid TEXT NOT NULL UNIQUE,"
+        "name TEXT NOT NULL,"
+        "last_path TEXT,"
+        "size REAL,"
+        "active INTEGER NOT NULL,"
+        "file_hash BLOB NOT NULL,"
+        "current_vault_path TEXT NOT NULL"
+        ");"
+
+        "CREATE TABLE IF NOT EXISTS projects ("
+        "project_uuid TEXT NOT NULL UNIQUE,"
+        "name TEXT NOT NULL,"
+        "vault_path TEXT NOT NULL,"
+        "create_date TEXT NOT NULL,"
+        "modification_date TEXT NOT NULL"
+        ");"
+
+        "CREATE TABLE IF NOT EXISTS repaire_files ("
+        "file_uuid TEXT NOT NULL"
+        ");";
+
+    char* errMsg = nullptr;
+    int rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
+
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL Fehler: " << errMsg << std::endl;
+        sqlite3_free(errMsg);
+    } else {
+        std::cout << "Tabellen erfolgreich erstellt\n";
+    }
+}
+
